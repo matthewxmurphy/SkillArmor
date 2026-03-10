@@ -1,0 +1,69 @@
+{
+  "version": "0.5.0",
+  "scan": {
+    "ociCostDays": 30,
+    "allowedPublicInboundTcpPorts": [
+      22,
+      80,
+      443
+    ],
+    "timeoutSeconds": 25
+  },
+  "ociProfiles": [
+    {
+      "profile": "DEFAULT",
+      "label": "Net30 Main",
+      "owner": "Matthew Murphy",
+      "environment": "prod",
+      "enabled": true
+    },
+    {
+      "profile": "rick74",
+      "label": "Rick74 Tenancy",
+      "owner": "rick@circle...",
+      "environment": "prod",
+      "enabled": true
+    }
+  ],
+  "sshTargets": [
+    {
+      "name": "primary-oracle",
+      "host": "",
+      "user": "ubuntu",
+      "port": 22,
+      "sshKeyPath": "",
+      "enabled": false
+    }
+  ],
+  "heartbeatEndpoints": [
+    {
+      "name": "ryzen-heartbeat",
+      "url": "http://192.168.88.11:1234/v1/models",
+      "expectModelContains": [
+        "phi",
+        "gpt-oss"
+      ],
+      "enabled": true
+    }
+  ],
+  "sesDomains": [
+    {
+      "domain": "net30hosting.com",
+      "spfIncludes": [
+        "amazonses.com"
+      ],
+      "dkimSelectors": [],
+      "requireDmarc": true,
+      "enabled": true
+    }
+  ],
+  "enhance": {
+    "enabled": false,
+    "baseUrl": "https://api.enhance.com",
+    "bearerTokenEnv": "ENHANCE_BEARER_TOKEN",
+    "orgIds": [
+      "8a33857a-cb89-4372-ab29-4d887c961d89"
+    ],
+    "dnsRecordTargets": []
+  }
+}

@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CTO Ops Dashboard</title>
+    <style>
+      :root {
+        --bg: #0b1118;
+        --panel: #141d28;
+        --panel-2: #1a2634;
+        --line: #2f3f52;
+        --text: #d8e1ec;
+        --muted: #91a2b5;
+        --ok: #39c173;
+        --warn: #f0b14b;
+        --bad: #ef6a6a;
+        --accent: #66b3ff;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "SF Mono", "Menlo", "Consolas", monospace;
+        color: var(--text);
+        background: radial-gradient(circle at top, #132132, var(--bg) 48%);
+      }
+      .wrap {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 20px;
+        display: grid;
+        gap: 14px;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 12px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+      }
+      .hero {
+        background:
+          radial-gradient(circle at 15% 30%, rgba(102, 179, 255, 0.16), transparent 50%),
+          radial-gradient(circle at 80% 10%, rgba(57, 193, 115, 0.14), transparent 40%),
+          var(--panel);
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      h1, h2 {
+        margin: 0;
+      }
+      h1 { font-size: 20px; }
+      h2 { font-size: 15px; margin-bottom: 8px; }
+      .muted { color: var(--muted); font-size: 12px; }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 8px;
+      }
+      .stat {
+        background: var(--panel-2);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px;
+      }
+      .stat .k { color: var(--muted); font-size: 12px; }
+      .stat .v { font-weight: 700; font-size: 20px; }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+      th, td {
+        border-bottom: 1px solid var(--line);
+        padding: 7px;
+        text-align: left;
+        vertical-align: top;
+      }
+      th { color: var(--muted); font-weight: 600; }
+      .badge {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 2px 8px;
+        font-size: 11px;
+        display: inline-block;
+      }
+      .tag {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 1px 6px;
+        font-size: 11px;
+      }
+      .ok { color: var(--ok); }
+      .warn { color: var(--warn); }
+      .bad { color: var(--bad); }
+      .code {
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: #0f1721;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px;
+        font-size: 11px;
+      }
+      .chart-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 10px;
+      }
+      .chart-panel {
+        background: var(--panel-2);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px;
+      }
+      .chart-wrap {
+        position: relative;
+        height: 250px;
+      }
+      .chart-msg {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 10px;
+      }
+      a { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card hero">
+        <div class="row">
+          <h1>CTO Ops Dashboard</h1>
+          <span class="badge">OCI + Firewall + CrowdSec + SES + Enhance</span>
+        </div>
+        <div id="meta" class="muted">Loading snapshot…</div>
+        <div class="row" style="margin-top: 8px;">
+          <button id="reloadBtn">Reload</button>
+          <button id="copyCmdBtn">Copy scan command</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Executive Summary</h2>
+        <div id="stats" class="stats"></div>
+      </div>
+
+      <div class="card">
+        <h2>Charts</h2>
+        <div class="chart-grid">
+          <div class="chart-panel">
+            <div class="muted" style="margin-bottom: 8px;">Issue Mix</div>
+            <div class="chart-wrap">
+              <canvas id="healthChart"></canvas>
+              <div id="healthChartMsg" class="chart-msg muted" hidden></div>
+            </div>
+          </div>
+          <div class="chart-panel">
+            <div class="muted" style="margin-bottom: 8px;">OCI Cost + Auth</div>
+            <div class="chart-wrap">
+              <canvas id="ociCostChart"></canvas>
+              <div id="ociCostChartMsg" class="chart-msg muted" hidden></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>OCI Accounts + Cost</h2>
+        <div id="ociTable"></div>
+      </div>
+
+      <div class="card">
+        <h2>Public Firewall Findings</h2>
+        <div id="fwTable"></div>
+      </div>
+
+      <div class="card">
+        <h2>Server Security (CrowdSec)</h2>
+        <div id="sshTable"></div>
+      </div>
+
+      <div class="card">
+        <h2>Heartbeat Endpoints</h2>
+        <div id="hbTable"></div>
+      </div>
+
+      <div class="card">
+        <h2>Amazon SES DNS Posture</h2>
+        <div id="sesTable"></div>
+      </div>
+
+      <div class="card">
+        <h2>Enhance API</h2>
+        <div id="enhanceBox"></div>
+      </div>
+    </div>
+
+    <script src="./cto-data.js"></script>
+    <script src="./assets/vendor/charts.js"></script>
+    <script>
+      const DATA_FILE = "../data/cto-ops-snapshot.json";
+      const SCAN_CMD = "python3 /Volumes/MacHome/Users/mmurphy/openclaw-ops/clawhub-analytizer/scripts/cto-ops-scan.py && python3 /Volumes/MacHome/Users/mmurphy/openclaw-ops/clawhub-analytizer/scripts/build-cto-dashboard-data.py";
+      let data = null;
+      let healthChart = null;
+      let ociCostChart = null;
+
+      function esc(text) {
+        return String(text ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      }
+
+      async function getJson(path) {
+        const res = await fetch(path, { cache: "no-store" });
+        if (!res.ok) throw new Error(path + " load failed (" + res.status + ")");
+        return await res.json();
+      }
+
+      function badge(ok) {
+        return ok
+          ? '<span class="badge ok">ok</span>'
+          : '<span class="badge bad">needs attention</span>';
+      }
+
+      function renderStats() {
+        const s = data?.summary || {};
+        const rows = [
+          ["OCI Profiles", s.ociProfileCount ?? 0],
+          ["OCI Auth OK", s.ociAuthOkCount ?? 0],
+          ["Estimated Cost", "$" + Number(s.estimatedMonthlyCost || 0).toFixed(2)],
+          ["Unexpected Public Ports", s.firewallUnexpectedPublicIngressCount ?? 0],
+          ["CrowdSec Missing", s.crowdsecMissingCount ?? 0],
+          ["Heartbeat Failures", s.heartbeatFailures ?? 0],
+          ["SES DNS Failures", s.sesDomainFailures ?? 0]
+        ];
+        document.getElementById("stats").innerHTML = rows.map(([k, v]) =>
+          `<div class="stat"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`
+        ).join("");
+      }
+
+      function setChartMsg(id, msg) {
+        const box = document.getElementById(id);
+        if (!box) return;
+        if (!msg) {
+          box.hidden = true;
+          box.textContent = "";
+          return;
+        }
+        box.hidden = false;
+        box.textContent = msg;
+      }
+
+      function destroyCharts() {
+        if (healthChart) {
+          healthChart.destroy();
+          healthChart = null;
+        }
+        if (ociCostChart) {
+          ociCostChart.destroy();
+          ociCostChart = null;
+        }
+      }
+
+      function renderCharts() {
+        destroyCharts();
+
+        if (!window.Chart) {
+          setChartMsg("healthChartMsg", "Chart.js failed to load.");
+          setChartMsg("ociCostChartMsg", "Chart.js failed to load.");
+          return;
+        }
+
+        setChartMsg("healthChartMsg", "");
+        setChartMsg("ociCostChartMsg", "");
+
+        const s = data?.summary || {};
+        const issuePairs = [
+          ["OCI Auth Failures", Math.max((s.ociProfileCount || 0) - (s.ociAuthOkCount || 0), 0), "#ef6a6a"],
+          ["Unexpected Public Ports", Number(s.firewallUnexpectedPublicIngressCount || 0), "#f0b14b"],
+          ["CrowdSec Missing", Number(s.crowdsecMissingCount || 0), "#66b3ff"],
+          ["Heartbeat Failures", Number(s.heartbeatFailures || 0), "#8f7cff"],
+          ["SES DNS Failures", Number(s.sesDomainFailures || 0), "#ff8d4d"]
+        ].filter((x) => x[1] > 0);
+
+        const healthCtx = document.getElementById("healthChart");
+        if (healthCtx) {
+          if (!issuePairs.length) {
+            healthChart = new Chart(healthCtx, {
+              type: "doughnut",
+              data: {
+                labels: ["No active issues"],
+                datasets: [{ data: [1], backgroundColor: ["#39c173"], borderWidth: 0 }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: "bottom", labels: { color: "#d8e1ec" } } }
+              }
+            });
+          } else {
+            healthChart = new Chart(healthCtx, {
+              type: "doughnut",
+              data: {
+                labels: issuePairs.map((x) => x[0]),
+                datasets: [{ data: issuePairs.map((x) => x[1]), backgroundColor: issuePairs.map((x) => x[2]), borderWidth: 0 }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: "bottom", labels: { color: "#d8e1ec" } } }
+              }
+            });
+          }
+        }
+
+        const profiles = (data?.ociProfiles || []).filter((x) => x.enabled !== false);
+        const ociCtx = document.getElementById("ociCostChart");
+        if (ociCtx) {
+          if (!profiles.length) {
+            setChartMsg("ociCostChartMsg", "No enabled OCI profiles.");
+            return;
+          }
+          const labels = profiles.map((x) => x.label || x.profile || "profile");
+          const costs = profiles.map((x) => Number(x?.cost?.totalCost || 0));
+          const auth = profiles.map((x) => x.authOk ? 1 : 0);
+          ociCostChart = new Chart(ociCtx, {
+            data: {
+              labels,
+              datasets: [
+                {
+                  type: "bar",
+                  label: "Monthly Cost (USD)",
+                  data: costs,
+                  yAxisID: "y",
+                  backgroundColor: profiles.map((x) => x.authOk ? "rgba(57, 193, 115, 0.7)" : "rgba(239, 106, 106, 0.7)"),
+                  borderColor: profiles.map((x) => x.authOk ? "#39c173" : "#ef6a6a"),
+                  borderWidth: 1
+                },
+                {
+                  type: "line",
+                  label: "Auth OK (1/0)",
+                  data: auth,
+                  yAxisID: "y1",
+                  borderColor: "#66b3ff",
+                  backgroundColor: "#66b3ff",
+                  tension: 0.25,
+                  pointRadius: 4
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                x: { ticks: { color: "#d8e1ec" }, grid: { color: "rgba(47,63,82,0.25)" } },
+                y: {
+                  beginAtZero: true,
+                  ticks: { color: "#d8e1ec" },
+                  grid: { color: "rgba(47,63,82,0.25)" }
+                },
+                y1: {
+                  position: "right",
+                  beginAtZero: true,
+                  min: 0,
+                  max: 1,
+                  ticks: { stepSize: 1, color: "#d8e1ec" },
+                  grid: { drawOnChartArea: false }
+                }
+              },
+              plugins: {
+                legend: { labels: { color: "#d8e1ec" } }
+              }
+            }
+          });
+        }
+      }
+
+      function renderOci() {
+        const items = data?.ociProfiles || [];
+        if (!items.length) {
+          document.getElementById("ociTable").innerHTML = "<div class='muted'>No OCI profile rows.</div>";
+          return;
+        }
+        const sorted = [...items].sort((a, b) => String(a.label || a.profile || "").localeCompare(String(b.label || b.profile || "")));
+        const html = `
+          <table>
+            <thead>
+              <tr><th>Account Label</th><th>Profile</th><th>Owner</th><th>Env</th><th>Region</th><th>Auth</th><th>Total Cost</th><th>Top Services</th><th>Errors</th></tr>
+            </thead>
+            <tbody>
+              ${sorted.map((x) => `
+                <tr>
+                  <td><strong>${esc(x.label || x.profile)}</strong></td>
+                  <td><span class="tag">${esc(x.profile)}</span></td>
+                  <td>${esc(x.owner || "-")}</td>
+                  <td>${esc(x.environment || "-")}</td>
+                  <td>${esc(x.region || "-")}</td>
+                  <td>${x.enabled === false ? '<span class="badge warn">disabled</span>' : badge(!!x.authOk)}</td>
+                  <td>${x.cost?.totalCost == null ? "-" : "$" + Number(x.cost.totalCost).toFixed(2)}</td>
+                  <td>${esc((x.cost?.services || []).slice(0, 5).map((s) => `${s.service}:${Number(s.cost).toFixed(2)}`).join(", ") || "-")}</td>
+                  <td class="bad">${esc(x.authError || x.cost?.error || "-")}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        `;
+        document.getElementById("ociTable").innerHTML = html;
+      }
+
+      function renderFirewall() {
+        const rows = data?.firewallFindings || [];
+        if (!rows.length) {
+          document.getElementById("fwTable").innerHTML = "<div class='muted'>No public ingress findings captured.</div>";
+          return;
+        }
+        const html = `
+          <table>
+            <thead>
+              <tr><th>Profile</th><th>VCN</th><th>Object</th><th>Source</th><th>Proto</th><th>Ports</th><th>Risk</th></tr>
+            </thead>
+            <tbody>
+              ${rows.slice(0, 300).map((x) => `
+                <tr>
+                  <td>${esc(x.profile)}</td>
+                  <td>${esc(x.vcn)}</td>
+                  <td>${esc(x.securityObject)}</td>
+                  <td>${esc(x.source)}</td>
+                  <td>${esc(x.protocol)}</td>
+                  <td>${esc(x.portLabel)}</td>
+                  <td>${x.unexpected ? '<span class="badge bad">unexpected open port</span>' : '<span class="badge ok">allowed</span>'}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        `;
+        document.getElementById("fwTable").innerHTML = html;
+      }
+
+      function renderSsh() {
+        const rows = data?.sshHosts || [];
+        if (!rows.length) {
+          document.getElementById("sshTable").innerHTML = "<div class='muted'>No SSH targets configured.</div>";
+          return;
+        }
+        document.getElementById("sshTable").innerHTML = `
+          <table>
+            <thead><tr><th>Name</th><th>Host</th><th>Status</th><th>CrowdSec</th><th>Ports</th><th>Error</th></tr></thead>
+            <tbody>
+              ${rows.map((x) => `
+                <tr>
+                  <td>${esc(x.name)}</td>
+                  <td>${esc(x.host || "-")}</td>
+                  <td>${badge(!!x.ok)}</td>
+                  <td>${x.ok ? esc((x.crowdsecInstalled ? "installed" : "missing") + " / " + (x.crowdsecActive || "unknown")) : "-"}</td>
+                  <td>${esc(x.listeningPortsRaw || "-")}</td>
+                  <td class="bad">${esc(x.error || "-")}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        `;
+      }
+
+      function renderHeartbeat() {
+        const rows = data?.heartbeat || [];
+        if (!rows.length) {
+          document.getElementById("hbTable").innerHTML = "<div class='muted'>No heartbeat endpoints configured.</div>";
+          return;
+        }
+        document.getElementById("hbTable").innerHTML = `
+          <table>
+            <thead><tr><th>Name</th><th>URL</th><th>Status</th><th>Models</th><th>Error</th></tr></thead>
+            <tbody>
+              ${rows.map((x) => `
+                <tr>
+                  <td>${esc(x.name)}</td>
+                  <td>${esc(x.url || "-")}</td>
+                  <td>${badge(!!x.ok)}</td>
+                  <td>${esc((x.models || []).join(", ") || "-")}</td>
+                  <td class="bad">${esc(x.error || "-")}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        `;
+      }
+
+      function renderSes() {
+        const rows = data?.sesDns || [];
+        if (!rows.length) {
+          document.getElementById("sesTable").innerHTML = "<div class='muted'>No SES domains configured.</div>";
+          return;
+        }
+        document.getElementById("sesTable").innerHTML = `
+          <table>
+            <thead><tr><th>Domain</th><th>Status</th><th>Missing SPF</th><th>DMARC</th><th>DKIM</th></tr></thead>
+            <tbody>
+              ${rows.map((x) => `
+                <tr>
+                  <td>${esc(x.domain)}</td>
+                  <td>${badge(!!x.ok)}</td>
+                  <td>${esc((x.missingSpfIncludes || []).join(", ") || "-")}</td>
+                  <td>${x.hasDmarc ? '<span class="ok">present</span>' : '<span class="bad">missing</span>'}</td>
+                  <td>${esc((x.dkim || []).map((d) => `${d.selector}:${d.ok ? "ok" : "missing"}`).join(", ") || "-")}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        `;
+      }
+
+      function renderEnhance() {
+        const x = data?.enhance || { enabled: false };
+        const orgRows = (x.orgs || []).map((o) => `- ${o.orgId}: ${o.ok ? "ok" : "fail"} ${o.error || ""}`).join("\n");
+        const dnsRows = (x.dnsTargets || []).map((d) => `- ${d.domain || d.domainId}: ${d.ok ? "ok" : "fail"} ${d.error || ""}`).join("\n");
+        document.getElementById("enhanceBox").innerHTML = `
+          <div class="row">
+            <span class="badge">${x.enabled ? "enabled" : "disabled"}</span>
+            ${x.enabled ? badge(!!x.authOk) : ""}
+          </div>
+          <div class="muted">Base URL: ${esc(x.baseUrl || "-")} | token env: ${esc(x.tokenEnv || "-")}</div>
+          <div class="code" style="margin-top: 8px;">Errors:\n${esc((x.errors || []).join("\n") || "-")}\n\nOrg scans:\n${esc(orgRows || "-")}\n\nDNS target scans:\n${esc(dnsRows || "-")}</div>
+        `;
+      }
+
+      function renderAll() {
+        const meta = document.getElementById("meta");
+        const host = data?.host || {};
+        meta.textContent = `Generated: ${data?.generatedAt || "n/a"} | Host: ${host.hostname || "n/a"} | Python: ${host.python || "n/a"}`;
+        renderStats();
+        renderCharts();
+        renderOci();
+        renderFirewall();
+        renderSsh();
+        renderHeartbeat();
+        renderSes();
+        renderEnhance();
+      }
+
+      async function loadAll() {
+        if (window.CTO_OPS_DATA && window.CTO_OPS_DATA.generatedAt) {
+          data = window.CTO_OPS_DATA;
+          renderAll();
+          return;
+        }
+        data = await getJson(DATA_FILE);
+        renderAll();
+      }
+
+      document.getElementById("reloadBtn").addEventListener("click", loadAll);
+      document.getElementById("copyCmdBtn").addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(SCAN_CMD);
+        } catch {}
+      });
+
+      loadAll().catch((err) => {
+        document.getElementById("meta").textContent = "Load failed: " + err.message;
+      });
+    </script>
+  </body>
+</html>

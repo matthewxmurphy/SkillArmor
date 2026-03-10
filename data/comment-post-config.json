@@ -1,0 +1,5 @@
+{
+  "enabled": false,
+  "maxPostsPerRun": 1,
+  "postCommandTemplate": ""
+}

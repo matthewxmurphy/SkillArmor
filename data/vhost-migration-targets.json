@@ -1,0 +1,39 @@
+{
+  "version": "0.5.0",
+  "policy": {
+    "requireIpv6": true,
+    "preferLowestCost": true,
+    "maxMonthlyCostUsd": null,
+    "freeTierThresholdUsd": 0.5
+  },
+  "targets": [
+    {
+      "id": "net30-main-oci",
+      "label": "Net30 Main OCI",
+      "ociProfile": "DEFAULT",
+      "region": "us-ashburn-1",
+      "host": "",
+      "ipv4": "",
+      "ipv6": "",
+      "sshUser": "ubuntu",
+      "sshPort": 22,
+      "sshKeyPath": "/System/Volumes/Data/Projects/vhost-m1/keys/m1_vhost_ed25519",
+      "enabled": true,
+      "notes": "Primary Net30 target."
+    },
+    {
+      "id": "rick74-oci",
+      "label": "Rick74 OCI",
+      "ociProfile": "rick74",
+      "region": "",
+      "host": "",
+      "ipv4": "",
+      "ipv6": "",
+      "sshUser": "ubuntu",
+      "sshPort": 22,
+      "sshKeyPath": "/System/Volumes/Data/Projects/vhost-m1/keys/m1_vhost_ed25519",
+      "enabled": true,
+      "notes": "Secondary tenancy target."
+    }
+  ]
+}

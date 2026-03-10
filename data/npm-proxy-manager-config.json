@@ -1,0 +1,48 @@
+{
+  "version": "0.5.0",
+  "scan": {
+    "timeoutSeconds": 25
+  },
+  "npm": {
+    "baseUrl": "http://127.0.0.1:81/api",
+    "identity": "admin@example.com",
+    "secretEnv": "NPM_API_PASSWORD",
+    "verifyTls": true
+  },
+  "localDns": {
+    "domainSuffix": "m1.local",
+    "targetIp": "192.168.88.13",
+    "dnsmasqConfigPath": "/opt/homebrew/etc/dnsmasq.d/m1-local.conf",
+    "resolverDir": "/etc/resolver",
+    "resolverFile": "m1.local",
+    "enabled": false
+  },
+  "defaults": {
+    "scheme": "http",
+    "websocketSupport": true,
+    "blockExploits": true,
+    "accessListId": 0,
+    "certificateId": 0,
+    "sslForced": false,
+    "http2Support": false,
+    "hstsEnabled": false,
+    "hstsSubdomains": false,
+    "cacheAssets": false
+  },
+  "hosts": [
+    {
+      "id": "cto-dashboard",
+      "subdomain": "cto",
+      "forwardHost": "127.0.0.1",
+      "forwardPort": 8787,
+      "enabled": true
+    },
+    {
+      "id": "openclaw-gateway",
+      "subdomain": "gateway",
+      "forwardHost": "127.0.0.1",
+      "forwardPort": 18789,
+      "enabled": true
+    }
+  ]
+}
