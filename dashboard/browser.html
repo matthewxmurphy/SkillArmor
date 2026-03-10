@@ -1,0 +1,1938 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>OpenClaw AI Ops Checklist</title>
+    <link rel="icon" type="image/png" sizes="256x256" href="./assets/ai-favicon.png">
+    <link rel="apple-touch-icon" href="./assets/ai-favicon.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <style>
+      :root {
+        --bg: #0d1117;
+        --bg-accent: #19212e;
+        --panel: #161b22;
+        --panel-alt: #1f2630;
+        --line: #30363d;
+        --text: #c9d1d9;
+        --muted: #8b949e;
+        --ok: #3fb950;
+        --warn: #d29922;
+        --bad: #f85149;
+        --accent: #58a6ff;
+        --accent-hover: #9ecbff;
+        --overlay-a: rgba(6, 12, 18, 0.75);
+        --overlay-b: rgba(9, 16, 23, 0.9);
+        --rail-bg: rgba(22, 27, 34, 0.88);
+        --rail-shadow: rgba(0, 0, 0, 0.28);
+      }
+
+      body[data-theme="light"] {
+        --bg: #edf2f9;
+        --bg-accent: #e6edf6;
+        --panel: #ffffff;
+        --panel-alt: #f7fafe;
+        --line: #ced9e5;
+        --text: #1c2632;
+        --muted: #536275;
+        --accent: #0b63c9;
+        --accent-hover: #1e79df;
+        --overlay-a: rgba(239, 245, 252, 0.66);
+        --overlay-b: rgba(232, 240, 250, 0.84);
+        --rail-bg: rgba(255, 255, 255, 0.9);
+        --rail-shadow: rgba(8, 25, 46, 0.14);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "SF Mono", "Menlo", "Consolas", monospace;
+        background: radial-gradient(circle at top, var(--bg-accent) 0%, var(--bg) 45%);
+        color: var(--text);
+        position: relative;
+        overflow-x: hidden;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: linear-gradient(120deg, var(--overlay-a), var(--overlay-b)), url("./assets/ai-brand.png");
+        background-size: cover;
+        background-position: center;
+        opacity: 0.14;
+        pointer-events: none;
+        z-index: -1;
+      }
+
+      .wrap {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px 20px 20px 96px;
+        display: grid;
+        gap: 16px;
+      }
+
+      .icon-rail {
+        position: fixed;
+        top: 20px;
+        left: 18px;
+        z-index: 1200;
+        display: grid;
+        gap: 10px;
+        width: 52px;
+      }
+
+      .rail-icon {
+        width: 52px;
+        height: 52px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        display: grid;
+        place-items: center;
+        text-decoration: none;
+        font-size: 19px;
+        background: var(--rail-bg);
+        backdrop-filter: blur(6px);
+        box-shadow: 0 4px 14px var(--rail-shadow);
+        transition: transform 140ms ease, border-color 140ms ease;
+        position: relative;
+      }
+
+      .rail-badge {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        min-width: 20px;
+        height: 20px;
+        padding: 0 5px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 700;
+        background: #8b1a1a;
+        color: #fff;
+      }
+
+      .rail-badge.is-zero {
+        background: #2b4d36;
+      }
+
+      .rail-icon:hover {
+        transform: translateY(-1px);
+        border-color: var(--accent);
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px;
+      }
+
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+      }
+
+      h1, h2, h3 {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 20px;
+      }
+
+      h2 {
+        font-size: 16px;
+        margin-bottom: 10px;
+      }
+
+      .meta {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .brand-image {
+        width: 84px;
+        height: 84px;
+        object-fit: contain;
+        border-radius: 0;
+        border: 0;
+        box-shadow: none;
+        background: transparent;
+      }
+
+      .ai-pill {
+        border: 1px solid #2f6d4a;
+        color: #84f7ad;
+        background: rgba(39, 111, 72, 0.25);
+        border-radius: 999px;
+        padding: 2px 9px;
+        font-size: 11px;
+        letter-spacing: 0.03em;
+      }
+
+      button, select, input, textarea {
+        background: var(--panel-alt);
+        border: 1px solid var(--line);
+        color: var(--text);
+        border-radius: 8px;
+        font: inherit;
+      }
+
+      a {
+        color: var(--accent);
+      }
+
+      a:hover {
+        color: var(--accent-hover);
+      }
+
+      button {
+        padding: 8px 10px;
+        cursor: pointer;
+      }
+
+      button:hover {
+        border-color: var(--accent);
+      }
+
+      select, input, textarea {
+        padding: 6px 8px;
+      }
+
+      textarea {
+        width: 100%;
+        min-height: 56px;
+        resize: vertical;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 10px;
+      }
+
+      .stat {
+        background: var(--panel-alt);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px;
+      }
+
+      .stat .k {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .stat .v {
+        font-size: 20px;
+        font-weight: 700;
+      }
+
+      .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+
+      .finding {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px;
+        background: var(--panel-alt);
+        display: grid;
+        gap: 8px;
+      }
+
+      .risk {
+        display: inline-block;
+        font-size: 11px;
+        padding: 2px 7px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+      }
+
+      .risk.high,
+      .risk.high_operational {
+        color: #fff;
+        background: #8e1f1f;
+        border-color: #b43f3f;
+      }
+
+      .risk.medium,
+      .risk.review_needed {
+        color: #fff;
+        background: #7d5b10;
+        border-color: #ba8f2b;
+      }
+
+      .risk.low {
+        color: #fff;
+        background: #1d5f2d;
+        border-color: #2e8241;
+      }
+
+      .risk.critical {
+        color: #fff;
+        background: #8b1a1a;
+        border-color: #ff6b6b;
+      }
+
+      .risk.none {
+        color: #fff;
+        background: #3b4450;
+        border-color: #626d7d;
+      }
+
+      .finding-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .owner-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .owner-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: transparent;
+        border: 0;
+        padding: 0;
+        margin: 0;
+        color: inherit;
+        cursor: pointer;
+      }
+
+      .owner-button:hover {
+        color: var(--accent-hover);
+      }
+
+      .avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        flex: 0 0 36px;
+      }
+
+      .author-emoji {
+        font-size: 28px;
+        line-height: 1;
+      }
+
+      .owner-extra {
+        border: 1px dashed var(--line);
+        border-radius: 8px;
+        padding: 6px 8px;
+        background: rgba(20, 26, 33, 0.38);
+      }
+
+      body[data-theme="light"] .owner-extra {
+        background: rgba(245, 250, 255, 0.92);
+      }
+
+      .finding h3 {
+        font-size: 15px;
+      }
+
+      .muted {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .small {
+        font-size: 12px;
+      }
+
+      .codebox {
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: #101926;
+        color: #f3f8ff;
+        border: 1px solid #526377;
+        border-radius: 8px;
+        padding: 10px;
+        font-size: 12px;
+        line-height: 1.45;
+        max-height: 220px;
+        overflow: auto;
+      }
+
+      body[data-theme="light"] .codebox {
+        background: #f4f8fe;
+        color: #122136;
+        border-color: #b5c5d9;
+      }
+
+      .todo-item {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-alt);
+        padding: 10px;
+        display: grid;
+        gap: 8px;
+      }
+
+      .pill {
+        padding: 2px 8px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        font-size: 11px;
+        display: inline-block;
+      }
+
+      .pill.pending {
+        color: #f7c775;
+      }
+
+      .pill.done {
+        color: #89e89a;
+      }
+
+      .block {
+        display: grid;
+        gap: 10px;
+      }
+
+      .loading {
+        color: var(--warn);
+        font-size: 13px;
+      }
+
+      .error {
+        color: var(--bad);
+        font-size: 13px;
+      }
+
+      .ok {
+        color: var(--ok);
+        font-size: 13px;
+      }
+
+      .hint {
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .runtime-signal {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px;
+        background: var(--panel-alt);
+        display: grid;
+        gap: 6px;
+      }
+
+      .ai-banner {
+        background:
+          radial-gradient(circle at 15% 25%, rgba(35, 177, 114, 0.16), transparent 50%),
+          radial-gradient(circle at 85% 70%, rgba(88, 166, 255, 0.15), transparent 52%),
+          var(--panel);
+      }
+
+      .ai-banner.status-ok {
+        border-color: rgba(63, 185, 80, 0.5);
+      }
+
+      .ai-banner.status-warn {
+        border-color: rgba(210, 153, 34, 0.58);
+      }
+
+      .ai-banner.status-bad {
+        border-color: rgba(248, 81, 73, 0.64);
+      }
+
+      .ai-orb {
+        width: 14px;
+        height: 14px;
+        border-radius: 999px;
+        background: #5dff96;
+        box-shadow: 0 0 14px rgba(93, 255, 150, 0.7);
+        animation: aiPulse 1.8s ease-in-out infinite;
+      }
+
+      @keyframes aiPulse {
+        0% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.28); opacity: 0.45; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+
+      .checklist {
+        display: grid;
+        gap: 8px;
+      }
+
+      .checklist label {
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+      }
+
+      .vhost-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 10px;
+      }
+
+      .vhost-item {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-alt);
+        padding: 10px;
+        display: grid;
+        gap: 8px;
+      }
+
+      .vhost-item h3 {
+        font-size: 14px;
+      }
+
+      .vhost-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .boot-splash {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: radial-gradient(circle at center, #00170b 0%, #000 70%);
+        color: #7dff9e;
+        font-size: clamp(28px, 6vw, 64px);
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        z-index: 9999;
+        opacity: 1;
+        transition: opacity 500ms ease;
+        text-shadow: 0 0 12px rgba(125, 255, 158, 0.45);
+      }
+
+      .boot-splash.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .boot-inner {
+        display: grid;
+        justify-items: center;
+        gap: 14px;
+      }
+
+      .boot-logo {
+        width: min(44vw, 300px);
+        aspect-ratio: 1 / 1;
+        object-fit: contain;
+        border-radius: 0;
+        border: 0;
+        box-shadow: none;
+        background: transparent;
+      }
+
+      .boot-title {
+        font-size: clamp(28px, 6vw, 64px);
+      }
+
+      .boot-sub {
+        font-size: clamp(12px, 2vw, 16px);
+        color: #8de8a9;
+        letter-spacing: 0.12em;
+      }
+
+      @media (max-width: 900px) {
+        .icon-rail {
+          display: none;
+        }
+
+        .wrap {
+          padding: 14px;
+        }
+
+        .grid-2 {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <aside class="icon-rail" aria-label="Quick nav">
+      <a class="rail-icon" href="#topSection" title="Top">
+        <i class="fa-solid fa-brain"></i>
+        <span class="rail-badge" id="railTopCount">0</span>
+      </a>
+      <a class="rail-icon" href="#runtimeSection" title="Runtime">
+        <i class="fa-solid fa-bolt"></i>
+        <span class="rail-badge" id="railRuntimeCount">0</span>
+      </a>
+      <a class="rail-icon" href="#summarySection" title="Summary">
+        <i class="fa-solid fa-chart-column"></i>
+        <span class="rail-badge" id="railSummaryCount">0</span>
+      </a>
+      <a class="rail-icon" href="#vhostSection" title="Vhosts">
+        <i class="fa-solid fa-globe"></i>
+        <span class="rail-badge" id="railVhostCount">0</span>
+      </a>
+      <a class="rail-icon" href="#findingsSection" title="Findings">
+        <i class="fa-solid fa-shield-halved"></i>
+        <span class="rail-badge" id="railFindingsCount">0</span>
+      </a>
+      <a class="rail-icon" href="#todoSection" title="Todo">
+        <i class="fa-solid fa-list-check"></i>
+        <span class="rail-badge" id="railTodoCount">0</span>
+      </a>
+    </aside>
+    <div class="boot-splash" id="bootSplash">
+      <div class="boot-inner">
+        <img class="boot-logo" src="./assets/ai-brand.png" alt="AI brand art">
+        <div class="boot-title">Wake up Neo</div>
+        <div class="boot-sub">AI ORCHESTRATION CONSOLE</div>
+      </div>
+    </div>
+    <div class="wrap">
+      <div class="card row" id="topSection">
+        <img class="brand-image" src="./assets/ai-brand.png" alt="AI brand icon">
+        <div style="flex: 1 1 360px;">
+          <div class="row" style="gap: 8px;">
+            <h1>OpenClaw AI Ops Checklist</h1>
+            <span class="ai-pill">AI MODE</span>
+          </div>
+          <div class="meta" id="metaLine">Loading local audit files...</div>
+        </div>
+        <label class="small">Theme
+          <select id="themeSelect">
+            <option value="auto">auto</option>
+            <option value="dark">dark</option>
+            <option value="light">light</option>
+          </select>
+        </label>
+        <button id="reloadBtn">Reload Files</button>
+        <button id="exportBtn">Export Selected JSON</button>
+      </div>
+
+      <div class="card ai-banner" id="aiBanner">
+        <div class="row" style="gap: 12px;">
+          <div class="ai-orb"></div>
+          <div>
+            <div><strong id="radarTitle">AI Engine Status</strong></div>
+            <div class="meta" id="radarSub">Waiting for runtime status.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="runtimeSection">
+        <h2>Runtime</h2>
+        <div id="runtimeSignals" class="block">
+          <div class="muted">No runtime signals loaded yet.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Load Status</h2>
+        <div id="statusBox" class="block">
+          <div class="loading">Reading `audit-findings.json`, `TODO.md`, `SKILLS-TODO.md`, and `AUDIT.md`...</div>
+        </div>
+        <div class="row" style="margin: 10px 0;">
+          <button id="manualLoadBtn">Load From Files</button>
+          <input id="filePicker" type="file" multiple accept=".json,.md,application/json,text/markdown,text/plain" style="display: none;">
+        </div>
+        <div class="hint">
+          If this page was opened directly with `file://`, your browser may block local fetch. Run from this folder with:
+          <code>cd /Volumes/MacHome/Users/mmurphy/openclaw-ops && python3 -m http.server 8787</code> and open <code>http://localhost:8787/clawhub-analytizer/dashboard/browser.html</code>.
+        </div>
+      </div>
+
+      <div class="card" id="vhostSection">
+        <h2>Vhost Manager</h2>
+        <div class="hint">
+          Track project domains here, export `vhost-projects.json`, then run the local generator/deployer script.
+        </div>
+        <div class="vhost-grid" style="margin-top: 10px;">
+          <label class="small">Project ID
+            <input id="vhostIdInput" type="text" placeholder="project-id">
+          </label>
+          <label class="small">Name
+            <input id="vhostNameInput" type="text" placeholder="Project name">
+          </label>
+          <label class="small">Domain
+            <input id="vhostDomainInput" type="text" placeholder="example.com">
+          </label>
+          <label class="small">Aliases (comma-separated)
+            <input id="vhostAliasesInput" type="text" placeholder="www.example.com,app.example.com">
+          </label>
+          <label class="small">Type
+            <select id="vhostTypeInput">
+              <option value="static">static</option>
+              <option value="proxy">proxy</option>
+            </select>
+          </label>
+          <label class="small">Root / Upstream
+            <input id="vhostTargetInput" type="text" placeholder="/var/www/site or http://127.0.0.1:3000">
+          </label>
+          <label class="small">Index (static only)
+            <input id="vhostIndexInput" type="text" value="index.html">
+          </label>
+          <label class="small">TLS
+            <select id="vhostTlsInput">
+              <option value="letsencrypt">letsencrypt</option>
+              <option value="none">none</option>
+            </select>
+          </label>
+        </div>
+        <div class="row" style="margin-top: 10px;">
+          <label class="small"><input id="vhostEnabledInput" type="checkbox" checked> enabled</label>
+          <label class="small"><input id="vhostSpaInput" type="checkbox" checked> spa fallback</label>
+          <label class="small"><input id="vhostForceHttpsInput" type="checkbox" checked> force https</label>
+          <input id="vhostEditKey" type="hidden">
+        </div>
+        <div class="row" style="margin-top: 10px;">
+          <button id="vhostSaveBtn">Save Project</button>
+          <button id="vhostResetBtn">Reset Form</button>
+          <button id="vhostExportBtn">Export vhost-projects.json</button>
+          <button id="vhostCopyGenerateBtn">Copy Generate Command</button>
+          <button id="vhostCopyDeployBtn">Copy Deploy Command</button>
+          <button id="vhostImportBtn">Import Plan JSON</button>
+          <input id="vhostImportPicker" type="file" accept=".json,application/json" style="display: none;">
+        </div>
+        <div class="codebox" id="vhostPlanPreview" style="margin-top: 10px;"></div>
+        <div id="vhostList" class="block" style="margin-top: 10px;"></div>
+      </div>
+
+      <div class="card" id="summarySection">
+        <h2>Risk Summary</h2>
+        <div id="stats" class="stats"></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <h2>Suggested Actions</h2>
+          <div id="suggestions" class="checklist"></div>
+        </div>
+        <div class="card">
+          <h2>Developer Pattern Watch</h2>
+          <div id="patterns" class="block"></div>
+        </div>
+      </div>
+
+      <div class="card" id="findingsSection">
+        <h2>Findings Checklist</h2>
+        <div class="row" style="margin-bottom: 10px;">
+          <label class="small">Filter Risk
+            <select id="riskFilter">
+              <option value="all">all</option>
+              <option value="high">high</option>
+              <option value="high_operational">high_operational</option>
+              <option value="medium">medium</option>
+              <option value="review_needed">review_needed</option>
+              <option value="low">low</option>
+            </select>
+          </label>
+        </div>
+        <div id="findingsList" class="block"></div>
+      </div>
+
+      <div class="grid-2" id="todoSection">
+        <div class="card">
+          <h2>TODO Guide</h2>
+          <div id="todoList" class="block"></div>
+        </div>
+        <div class="card">
+          <h2>Source Markdown</h2>
+          <h3 class="small">AUDIT.md</h3>
+          <div id="auditMdBox" class="codebox"></div>
+          <h3 class="small" style="margin-top: 10px;">TODO.md</h3>
+          <div id="todoMdBox" class="codebox"></div>
+          <h3 class="small" style="margin-top: 10px;">SKILLS-TODO.md</h3>
+          <div id="skillsTodoMdBox" class="codebox"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="browser-data.js"></script>
+    <script>
+      const FILES = {
+        json: "../data/audit-findings.json",
+        vhostPlan: "../data/vhost-projects.json",
+        todoMd: "../docs/TODO.md",
+        skillsTodoMd: "../docs/SKILLS-TODO.md",
+        auditMd: "../docs/AUDIT.md"
+      };
+
+      const STORAGE_KEY = "openclaw_ops_checklist_v1";
+      const VHOST_STORAGE_KEY = "openclaw_vhost_plan_v1";
+      const THEME_KEY = "openclaw_ops_theme_v1";
+      const VHOST_SCRIPT_PATH = "/Volumes/MacHome/Users/mmurphy/openclaw-ops/clawhub-analytizer/scripts/manage-vhosts.py";
+      const VHOST_PLAN_PATH = "/Volumes/MacHome/Users/mmurphy/openclaw-ops/clawhub-analytizer/data/vhost-projects.json";
+      const VHOST_DEPLOY_CFG_PATH = "/Volumes/MacHome/Users/mmurphy/openclaw-ops/clawhub-analytizer/data/vhost-deploy-config.json";
+      const VHOST_OUT_DIR = "/Volumes/MacHome/Users/mmurphy/openclaw-ops/clawhub-analytizer/output/vhosts";
+      const state = loadState();
+      const githubAjaxCache = new Map();
+      let auditData = null;
+      let todoRaw = "";
+      let skillsTodoRaw = "";
+      let auditRaw = "";
+      let vhostPlan = { version: "0.5.0", defaults: {}, projects: [] };
+
+      function loadState() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return { findings: {}, todos: {}, suggestions: {} };
+          return JSON.parse(raw);
+        } catch {
+          return { findings: {}, todos: {}, suggestions: {} };
+        }
+      }
+
+      function saveState() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      }
+
+      function esc(text) {
+        return String(text ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      }
+
+      async function getText(path) {
+        const res = await fetch(path, { cache: "no-store" });
+        if (!res.ok) throw new Error(path + " load failed (" + res.status + ")");
+        return await res.text();
+      }
+
+      async function getJson(path) {
+        const res = await fetch(path, { cache: "no-store" });
+        if (!res.ok) throw new Error(path + " load failed (" + res.status + ")");
+        return await res.json();
+      }
+
+      function fileText(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ""));
+          reader.onerror = () => reject(new Error("Could not read file: " + file.name));
+          reader.readAsText(file);
+        });
+      }
+
+      function setStatus(items) {
+        const box = document.getElementById("statusBox");
+        box.innerHTML = items.map((item) => {
+          const cls = item.ok ? "ok" : "error";
+          return `<div class="${cls}">${esc(item.message)}</div>`;
+        }).join("");
+      }
+
+      function parseTodoItems(mdText) {
+        const lines = mdText.split("\n");
+        const list = [];
+        const re = /^- \[(.*?)\] `([^`]+)` (.+)$/;
+        for (const line of lines) {
+          const m = line.match(re);
+          if (!m) continue;
+          const item = {
+            ts: m[1].trim(),
+            status: m[2].trim().toLowerCase(),
+            text: m[3].trim(),
+            id: (m[1] + "|" + m[3]).replace(/\s+/g, "_").toLowerCase()
+          };
+          list.push(item);
+        }
+        return list;
+      }
+
+      function computeRiskCounts(findings) {
+        const counts = {};
+        for (const f of findings) {
+          counts[f.risk] = (counts[f.risk] || 0) + 1;
+        }
+        return counts;
+      }
+
+      function githubProfileUrl(handle) {
+        return "https://github.com/" + encodeURIComponent(handle || "");
+      }
+
+      function githubAvatarUrl(handle) {
+        return "https://github.com/" + encodeURIComponent(handle || "") + ".png?size=44";
+      }
+
+      function ownerEmoji(level) {
+        if (level === "critical") return "🚨";
+        if (level === "high") return "🔥";
+        if (level === "medium") return "⚠️";
+        if (level === "low") return "🔎";
+        return "✅";
+      }
+
+      function maxSignalLevel(findings) {
+        const rank = { none: 0, low: 1, medium: 2, high: 3, critical: 4 };
+        let winner = "none";
+        for (const f of findings) {
+          const level = String(f.signalLevel || "none");
+          if ((rank[level] || 0) > (rank[winner] || 0)) winner = level;
+        }
+        return winner;
+      }
+
+      function ownerFindingSummary(handle) {
+        const findings = (auditData?.findings || []).filter((f) => String(f.owner?.handle || "").toLowerCase() === handle.toLowerCase());
+        const highest = maxSignalLevel(findings);
+        return { count: findings.length, highest };
+      }
+
+      function renderOwnerAjaxLine(handle, payload, error) {
+        const safeHandle = String(handle).replace(/"/g, '\\"');
+        const nodes = document.querySelectorAll(`[data-owner-ajax="${safeHandle}"]`);
+        const summary = ownerFindingSummary(handle);
+        if (!payload && !error) {
+          const msg = `Loading GitHub profile | findings ${summary.count} | top signal ${summary.highest}`;
+          nodes.forEach((node) => { node.textContent = msg; });
+          return;
+        }
+        if (error) {
+          const msg = `GitHub data unavailable | findings ${summary.count} | top signal ${summary.highest}`;
+          nodes.forEach((node) => { node.textContent = msg; });
+          return;
+        }
+        const name = payload?.name ? `${payload.name} ` : "";
+        const followers = Number(payload?.followers || 0);
+        const repos = Number(payload?.public_repos || 0);
+        const updated = String(payload?.updated_at || "").slice(0, 10) || "unknown";
+        const bio = payload?.bio ? ` | ${payload.bio}` : "";
+        const msg = `${name}repos ${repos} | followers ${followers} | updated ${updated} | findings ${summary.count} | top signal ${summary.highest}${bio}`;
+        nodes.forEach((node) => { node.textContent = msg; });
+      }
+
+      async function fetchGithubOwner(handle) {
+        const cached = githubAjaxCache.get(handle);
+        if (cached?.status === "loaded") return cached.data;
+        if (cached?.status === "loading") return cached.promise;
+        const url = "https://api.github.com/users/" + encodeURIComponent(handle);
+        const promise = fetch(url, { headers: { "Accept": "application/vnd.github+json" } })
+          .then((res) => {
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            return res.json();
+          })
+          .then((data) => {
+            githubAjaxCache.set(handle, { status: "loaded", data });
+            return data;
+          })
+          .catch((err) => {
+            githubAjaxCache.set(handle, { status: "error", error: err });
+            throw err;
+          });
+        githubAjaxCache.set(handle, { status: "loading", promise });
+        return promise;
+      }
+
+      function hydrateOwnerAjax(items) {
+        const handles = [...new Set(items.map((f) => String(f.owner?.handle || "").trim()).filter((h) => h && h.toLowerCase() !== "unknown"))];
+        handles.forEach((handle) => {
+          renderOwnerAjaxLine(handle, null, null);
+          fetchGithubOwner(handle)
+            .then((payload) => renderOwnerAjaxLine(handle, payload, null))
+            .catch((error) => renderOwnerAjaxLine(handle, null, error));
+        });
+      }
+
+      function setTheme(themeChoice) {
+        const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const resolved = themeChoice === "auto" ? (prefersDark ? "dark" : "light") : themeChoice;
+        document.body.setAttribute("data-theme", resolved);
+        const select = document.getElementById("themeSelect");
+        if (select && select.value !== themeChoice) {
+          select.value = themeChoice;
+        }
+      }
+
+      function setupTheme() {
+        const saved = localStorage.getItem(THEME_KEY) || "auto";
+        setTheme(saved);
+        const select = document.getElementById("themeSelect");
+        if (select) {
+          select.value = saved;
+          select.addEventListener("change", () => {
+            localStorage.setItem(THEME_KEY, select.value);
+            setTheme(select.value);
+          });
+        }
+        if (window.matchMedia) {
+          const mq = window.matchMedia("(prefers-color-scheme: dark)");
+          mq.addEventListener?.("change", () => {
+            const current = localStorage.getItem(THEME_KEY) || "auto";
+            if (current === "auto") setTheme("auto");
+          });
+        }
+      }
+
+      function normalizeVhostAliases(raw) {
+        if (Array.isArray(raw)) return [...new Set(raw.map((x) => String(x || "").trim().toLowerCase()).filter(Boolean))];
+        if (typeof raw === "string") return [...new Set(raw.split(",").map((x) => x.trim().toLowerCase()).filter(Boolean))];
+        return [];
+      }
+
+      function normalizeVhostId(text, fallbackDomain) {
+        const raw = String(text || "").trim().toLowerCase();
+        const seed = raw || String(fallbackDomain || "").trim().toLowerCase().replace(/\./g, "-") || "project";
+        return seed.replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "") || "project";
+      }
+
+      function normalizeVhostProject(raw, idx) {
+        const domain = String(raw?.domain || "").trim().toLowerCase();
+        if (!domain) return null;
+        const type = String(raw?.type || "static").trim().toLowerCase() === "proxy" ? "proxy" : "static";
+        const id = normalizeVhostId(raw?.id, domain);
+        const aliases = normalizeVhostAliases(raw?.aliases).filter((a) => a !== domain);
+        const project = {
+          id,
+          name: String(raw?.name || id).trim() || id,
+          domain,
+          aliases,
+          type,
+          enabled: raw?.enabled === undefined ? true : !!raw.enabled,
+          tls: String(raw?.tls || "letsencrypt").trim().toLowerCase() === "none" ? "none" : "letsencrypt",
+          forceHttps: raw?.forceHttps === undefined ? true : !!raw.forceHttps
+        };
+        if (type === "proxy") {
+          project.upstream = String(raw?.upstream || "").trim();
+        } else {
+          project.root = String(raw?.root || "").trim();
+          project.index = String(raw?.index || "index.html").trim() || "index.html";
+          project.spa = raw?.spa === undefined ? true : !!raw.spa;
+        }
+        project._sort = idx;
+        return project;
+      }
+
+      function normalizeVhostPlan(payload) {
+        const raw = payload && typeof payload === "object" ? payload : {};
+        const projectsRaw = Array.isArray(raw.projects) ? raw.projects : [];
+        const projects = projectsRaw
+          .map((p, idx) => normalizeVhostProject(p, idx))
+          .filter(Boolean)
+          .sort((a, b) => {
+            if (a.domain === b.domain) return a._sort - b._sort;
+            return a.domain.localeCompare(b.domain);
+          })
+          .map((x) => {
+            delete x._sort;
+            return x;
+          });
+        return {
+          version: String(raw.version || "0.5.0"),
+          defaults: raw.defaults && typeof raw.defaults === "object" ? raw.defaults : {},
+          projects
+        };
+      }
+
+      function loadVhostPlan() {
+        const local = localStorage.getItem(VHOST_STORAGE_KEY);
+        if (local) {
+          try {
+            return normalizeVhostPlan(JSON.parse(local));
+          } catch {}
+        }
+        const bundled = window.OPENCLAW_BROWSER_DATA?.vhostPlan;
+        return normalizeVhostPlan(bundled || { version: "0.5.0", defaults: {}, projects: [] });
+      }
+
+      function saveVhostPlan() {
+        localStorage.setItem(VHOST_STORAGE_KEY, JSON.stringify(vhostPlan));
+      }
+
+      function getVhostFormValue(id) {
+        const node = document.getElementById(id);
+        return node ? node.value : "";
+      }
+
+      function setVhostFormValue(id, value) {
+        const node = document.getElementById(id);
+        if (node) node.value = value ?? "";
+      }
+
+      function resetVhostForm() {
+        setVhostFormValue("vhostEditKey", "");
+        setVhostFormValue("vhostIdInput", "");
+        setVhostFormValue("vhostNameInput", "");
+        setVhostFormValue("vhostDomainInput", "");
+        setVhostFormValue("vhostAliasesInput", "");
+        setVhostFormValue("vhostTypeInput", "static");
+        setVhostFormValue("vhostTargetInput", "");
+        setVhostFormValue("vhostIndexInput", "index.html");
+        setVhostFormValue("vhostTlsInput", "letsencrypt");
+        const enabled = document.getElementById("vhostEnabledInput");
+        const spa = document.getElementById("vhostSpaInput");
+        const forceHttps = document.getElementById("vhostForceHttpsInput");
+        if (enabled) enabled.checked = true;
+        if (spa) spa.checked = true;
+        if (forceHttps) forceHttps.checked = true;
+      }
+
+      function readVhostFormProject() {
+        const domain = String(getVhostFormValue("vhostDomainInput")).trim().toLowerCase();
+        if (!domain) return null;
+        const type = String(getVhostFormValue("vhostTypeInput") || "static").trim().toLowerCase();
+        const base = {
+          id: normalizeVhostId(getVhostFormValue("vhostIdInput"), domain),
+          name: String(getVhostFormValue("vhostNameInput")).trim() || normalizeVhostId("", domain),
+          domain,
+          aliases: normalizeVhostAliases(getVhostFormValue("vhostAliasesInput")).filter((a) => a !== domain),
+          type: type === "proxy" ? "proxy" : "static",
+          enabled: !!document.getElementById("vhostEnabledInput")?.checked,
+          tls: String(getVhostFormValue("vhostTlsInput") || "letsencrypt").trim().toLowerCase() === "none" ? "none" : "letsencrypt",
+          forceHttps: !!document.getElementById("vhostForceHttpsInput")?.checked
+        };
+        const target = String(getVhostFormValue("vhostTargetInput")).trim();
+        if (base.type === "proxy") {
+          base.upstream = target;
+        } else {
+          base.root = target;
+          base.index = String(getVhostFormValue("vhostIndexInput")).trim() || "index.html";
+          base.spa = !!document.getElementById("vhostSpaInput")?.checked;
+        }
+        return base;
+      }
+
+      function renderVhostPlanPreview() {
+        const box = document.getElementById("vhostPlanPreview");
+        if (!box) return;
+        box.textContent = JSON.stringify(vhostPlan, null, 2);
+      }
+
+      function setVhostFormFromProject(project) {
+        setVhostFormValue("vhostEditKey", project.id);
+        setVhostFormValue("vhostIdInput", project.id);
+        setVhostFormValue("vhostNameInput", project.name || "");
+        setVhostFormValue("vhostDomainInput", project.domain || "");
+        setVhostFormValue("vhostAliasesInput", (project.aliases || []).join(","));
+        setVhostFormValue("vhostTypeInput", project.type || "static");
+        setVhostFormValue("vhostTargetInput", project.type === "proxy" ? (project.upstream || "") : (project.root || ""));
+        setVhostFormValue("vhostIndexInput", project.index || "index.html");
+        setVhostFormValue("vhostTlsInput", project.tls || "letsencrypt");
+        const enabled = document.getElementById("vhostEnabledInput");
+        const spa = document.getElementById("vhostSpaInput");
+        const forceHttps = document.getElementById("vhostForceHttpsInput");
+        if (enabled) enabled.checked = project.enabled !== false;
+        if (spa) spa.checked = project.spa !== false;
+        if (forceHttps) forceHttps.checked = project.forceHttps !== false;
+      }
+
+      function renderVhostList() {
+        const host = document.getElementById("vhostList");
+        if (!host) return;
+        const projects = vhostPlan.projects || [];
+        if (!projects.length) {
+          host.innerHTML = "<div class='muted'>No vhost projects yet.</div>";
+          renderVhostPlanPreview();
+          return;
+        }
+        host.innerHTML = projects.map((project) => {
+          const target = project.type === "proxy" ? project.upstream : project.root;
+          const aliases = (project.aliases || []).length ? project.aliases.join(", ") : "none";
+          return `
+            <div class="vhost-item">
+              <div class="row">
+                <h3>${esc(project.name || project.id)}</h3>
+                <span class="risk ${project.enabled === false ? "medium" : "low"}">${project.enabled === false ? "disabled" : "enabled"}</span>
+              </div>
+              <div class="small"><strong>${esc(project.domain)}</strong> (${esc(project.type)})</div>
+              <div class="muted small">aliases: ${esc(aliases)}</div>
+              <div class="muted small">target: ${esc(target || "missing")}</div>
+              <div class="muted small">tls: ${esc(project.tls || "letsencrypt")} | force https: ${esc(String(project.forceHttps !== false))}</div>
+              <div class="vhost-actions">
+                <button type="button" data-vhost-edit="${esc(project.id)}">Edit</button>
+                <button type="button" data-vhost-remove="${esc(project.id)}">Remove</button>
+              </div>
+            </div>
+          `;
+        }).join("");
+
+        host.querySelectorAll("[data-vhost-edit]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const id = btn.dataset.vhostEdit;
+            const project = vhostPlan.projects.find((x) => x.id === id);
+            if (!project) return;
+            setVhostFormFromProject(project);
+          });
+        });
+        host.querySelectorAll("[data-vhost-remove]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const id = btn.dataset.vhostRemove;
+            vhostPlan.projects = vhostPlan.projects.filter((x) => x.id !== id);
+            saveVhostPlan();
+            renderVhostList();
+            renderRailCounts();
+          });
+        });
+        renderVhostPlanPreview();
+      }
+
+      async function exportVhostPlan() {
+        const payload = JSON.stringify(vhostPlan, null, 2);
+        const blob = new Blob([payload], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "vhost-projects.json";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      function copyVhostCommand(isDeploy) {
+        const base = `python3 ${VHOST_SCRIPT_PATH} --plan ${VHOST_PLAN_PATH} --out-dir ${VHOST_OUT_DIR}`;
+        const cmd = isDeploy
+          ? `${base} --deploy --deploy-config ${VHOST_DEPLOY_CFG_PATH}`
+          : base;
+        copyText(cmd);
+      }
+
+      function saveVhostFromForm() {
+        const project = readVhostFormProject();
+        if (!project) {
+          setStatus([{ ok: false, message: "Vhost save failed: domain is required." }]);
+          return;
+        }
+        if (!project.id || !project.domain) {
+          setStatus([{ ok: false, message: "Vhost save failed: id/domain missing." }]);
+          return;
+        }
+        if (project.type === "proxy" && !project.upstream) {
+          setStatus([{ ok: false, message: "Vhost save failed: proxy project needs upstream URL." }]);
+          return;
+        }
+        if (project.type === "static" && !project.root) {
+          setStatus([{ ok: false, message: "Vhost save failed: static project needs root path." }]);
+          return;
+        }
+
+        const editId = String(getVhostFormValue("vhostEditKey")).trim();
+        if (editId) {
+          const idx = vhostPlan.projects.findIndex((x) => x.id === editId);
+          if (idx >= 0) {
+            vhostPlan.projects[idx] = project;
+          } else {
+            vhostPlan.projects.push(project);
+          }
+        } else {
+          const idx = vhostPlan.projects.findIndex((x) => x.id === project.id);
+          if (idx >= 0) vhostPlan.projects[idx] = project;
+          else vhostPlan.projects.push(project);
+        }
+
+        vhostPlan = normalizeVhostPlan(vhostPlan);
+        saveVhostPlan();
+        renderVhostList();
+        renderRailCounts();
+        resetVhostForm();
+        setStatus([{ ok: true, message: "Saved vhost project: " + project.id }]);
+      }
+
+      async function loadVhostFromPickedFile(fileList) {
+        const files = Array.from(fileList || []);
+        if (!files.length) return;
+        try {
+          const raw = await fileText(files[0]);
+          const payload = JSON.parse(raw);
+          vhostPlan = normalizeVhostPlan(payload);
+          saveVhostPlan();
+          renderVhostList();
+          renderRailCounts();
+        } catch (error) {
+          const box = document.getElementById("statusBox");
+          if (box) {
+            box.innerHTML = `<div class="error">vhost import failed: ${esc(error.message || error)}</div>`;
+          }
+        }
+      }
+
+      function wireVhostControls() {
+        document.getElementById("vhostSaveBtn")?.addEventListener("click", saveVhostFromForm);
+        document.getElementById("vhostResetBtn")?.addEventListener("click", resetVhostForm);
+        document.getElementById("vhostExportBtn")?.addEventListener("click", exportVhostPlan);
+        document.getElementById("vhostCopyGenerateBtn")?.addEventListener("click", () => copyVhostCommand(false));
+        document.getElementById("vhostCopyDeployBtn")?.addEventListener("click", () => copyVhostCommand(true));
+        document.getElementById("vhostImportBtn")?.addEventListener("click", () => {
+          document.getElementById("vhostImportPicker")?.click();
+        });
+        document.getElementById("vhostImportPicker")?.addEventListener("change", (e) => {
+          loadVhostFromPickedFile(e.target.files);
+        });
+        document.getElementById("vhostTypeInput")?.addEventListener("change", () => {
+          const type = getVhostFormValue("vhostTypeInput");
+          const input = document.getElementById("vhostTargetInput");
+          if (!input) return;
+          input.placeholder = type === "proxy" ? "http://127.0.0.1:3000" : "/var/www/project";
+        });
+      }
+
+      function renderStats() {
+        const stats = document.getElementById("stats");
+        if (!auditData) {
+          stats.innerHTML = "<div class='muted'>No data</div>";
+          return;
+        }
+        const findings = auditData.findings || [];
+        const counts = computeRiskCounts(findings);
+        const docsCount = findings.filter((f) => hasSkillDocsRef(f)).length;
+        const multiVersionCount = findings.filter((f) => (f.metrics?.versions || 0) >= 2).length;
+        const signalCounts = {
+          critical: findings.filter((f) => (f.signalLevel || "none") === "critical").length,
+          high: findings.filter((f) => (f.signalLevel || "none") === "high").length,
+          medium: findings.filter((f) => (f.signalLevel || "none") === "medium").length,
+          low: findings.filter((f) => (f.signalLevel || "none") === "low").length
+        };
+        const audited = auditData.scope?.skillsAudited ?? "-";
+        const generatedAt = auditData.generatedAt || "-";
+        const cards = [
+          ["Skills Audited", audited],
+          ["Findings", findings.length],
+          ["With SKILL.md Ref", docsCount],
+          ["Multi-Version", multiVersionCount],
+          ["Signal Critical", signalCounts.critical],
+          ["Signal High", signalCounts.high],
+          ["Signal Medium", signalCounts.medium],
+          ["Signal Low", signalCounts.low],
+          ["High", counts.high || 0],
+          ["High Operational", counts.high_operational || 0],
+          ["Medium", counts.medium || 0],
+          ["Review Needed", counts.review_needed || 0],
+          ["Low", counts.low || 0],
+          ["Generated", generatedAt]
+        ];
+        stats.innerHTML = cards.map(([k, v]) => {
+          return `<div class="stat"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`;
+        }).join("");
+      }
+
+      function renderSuggestions() {
+        const host = document.getElementById("suggestions");
+        const actions = auditData?.nextActions || [];
+        const templates = auditData?.autoComments || {};
+        const checklist = [];
+
+        for (const action of actions) {
+          const id = "action:" + action;
+          const checked = !!state.suggestions[id];
+          checklist.push(
+            `<label><input type="checkbox" data-suggestion="${esc(id)}" ${checked ? "checked" : ""}><span>${esc(action)}</span></label>`
+          );
+        }
+
+        const templateRows = Object.entries(templates).map(([k, v]) => {
+          const id = "template:" + k;
+          const checked = !!state.suggestions[id];
+          return `
+            <label>
+              <input type="checkbox" data-suggestion="${esc(id)}" ${checked ? "checked" : ""}>
+              <span><strong>${esc(k)}</strong><br><span class="muted">${esc(v)}</span></span>
+            </label>
+          `;
+        });
+
+        host.innerHTML = checklist.join("") + (templateRows.length ? "<hr>" + templateRows.join("") : "");
+
+        host.querySelectorAll("input[data-suggestion]").forEach((input) => {
+          input.addEventListener("change", () => {
+            state.suggestions[input.dataset.suggestion] = input.checked;
+            saveState();
+          });
+        });
+      }
+
+      function setRailBadge(id, value) {
+        const node = document.getElementById(id);
+        if (!node) return;
+        const num = Number(value) || 0;
+        node.textContent = String(num);
+        node.classList.toggle("is-zero", num <= 0);
+      }
+
+      function renderRailCounts() {
+        const findings = auditData?.findings || [];
+        const runtimeSignals = (auditData?.runtime?.signals || []).filter((s) => {
+          const level = String(s?.level || "low").toLowerCase();
+          return level === "high" || level === "critical";
+        });
+        const runtimeExtra = auditData?.runtime?.healthy ? 0 : 1;
+        const highRiskSignals = findings.filter((f) => ["critical", "high"].includes(String(f.signalLevel || "none"))).length;
+        const todoPending = parseTodoItems(todoRaw).filter((x) => x.status !== "done").length;
+        const enabledVhosts = (vhostPlan?.projects || []).filter((x) => x.enabled !== false).length;
+        setRailBadge("railTopCount", findings.length);
+        setRailBadge("railRuntimeCount", runtimeSignals.length + runtimeExtra);
+        setRailBadge("railSummaryCount", highRiskSignals);
+        setRailBadge("railVhostCount", enabledVhosts);
+        setRailBadge("railFindingsCount", findings.length);
+        setRailBadge("railTodoCount", todoPending);
+      }
+
+      function getBlockingRuntimeSignals(runtime) {
+        const list = runtime?.blockingSignals || runtime?.signals || [];
+        return (Array.isArray(list) ? list : []).filter((s) => {
+          const level = String(s?.level || "low").toLowerCase();
+          return level === "high" || level === "critical";
+        });
+      }
+
+      function describeRuntimeEngine(runtime) {
+        const engine = runtime?.engine || {};
+        const label = String(engine.label || "").trim();
+        const source = String(runtime?.source || engine.source || "unknown").trim();
+        const model = String(engine.model || "").trim();
+        const provider = String(engine.provider || "").trim();
+        const fallbackLabel = source ? source.replaceAll("_", " ") : "unknown";
+        const base = label || fallbackLabel;
+        const modelPart = model ? ` model ${model}` : "";
+        const providerPart = provider ? ` via ${provider}` : "";
+        return `${base}${providerPart}${modelPart}`;
+      }
+
+      function renderRadarBanner() {
+        const banner = document.getElementById("aiBanner");
+        const title = document.getElementById("radarTitle");
+        const sub = document.getElementById("radarSub");
+        if (!banner || !title || !sub) return;
+
+        banner.classList.remove("status-ok", "status-warn", "status-bad");
+        if (!auditData) {
+          title.textContent = "AI Engine Idle";
+          sub.textContent = "No audit payload loaded yet.";
+          banner.classList.add("status-warn");
+          return;
+        }
+
+        const runtime = auditData.runtime || {};
+        const signals = getBlockingRuntimeSignals(runtime);
+        const engineText = describeRuntimeEngine(runtime);
+
+        if (runtime.healthy && !signals.length) {
+          title.textContent = "AI Engine Active";
+          sub.textContent = engineText;
+          banner.classList.add("status-ok");
+          return;
+        }
+
+        if (runtime.healthy) {
+          const first = signals[0]?.message || "Runtime has non-blocking warnings.";
+          title.textContent = "AI Engine Active (Needs Attention)";
+          sub.textContent = `${engineText} | ${first}`;
+          banner.classList.add("status-warn");
+          return;
+        }
+
+        title.textContent = "AI Engine Blocked";
+        sub.textContent = signals[0]?.message || "Runtime health not established.";
+        banner.classList.add("status-bad");
+      }
+
+      function renderPatterns() {
+        const host = document.getElementById("patterns");
+        const patterns = auditData?.developerPatterns || [];
+        if (!patterns.length) {
+          host.innerHTML = "<div class='muted'>No pattern data.</div>";
+          return;
+        }
+        host.innerHTML = patterns.map((p) => {
+          const members = (p.members || []).length ? p.members.join(", ") : "none listed";
+          return `
+            <div class="finding">
+              <div class="finding-top">
+                <strong>${esc(p.type || "pattern")}</strong>
+                <span class="risk ${esc(p.severity || "low")}">${esc(p.severity || "n/a")}</span>
+              </div>
+              <div class="small">${esc(p.description || "")}</div>
+              <div class="muted">Members: ${esc(members)}</div>
+            </div>
+          `;
+        }).join("");
+      }
+
+      function renderRuntimeSignals() {
+        const host = document.getElementById("runtimeSignals");
+        const runtime = auditData?.runtime || {};
+        const signals = getBlockingRuntimeSignals(runtime);
+        const healthy = !!runtime.healthy;
+        const engine = runtime.engine || {};
+        const coverage = runtime.coverage || {};
+        const engineText = describeRuntimeEngine(runtime);
+        const header = healthy
+          ? "<div class='ok'>Scan runtime healthy.</div>"
+          : "<div class='error'>Scan runtime not healthy or not confirmed.</div>";
+        const endpoint = engine.endpoint
+          ? `<div class="small muted">Endpoint: <code>${esc(engine.endpoint)}</code></div>`
+          : "";
+        const coverageLine = Number(coverage.publicSkillsIngested || 0) > 0
+          ? `<div class="small muted">Coverage: ${esc(String(coverage.publicSkillsIngested))} skills from ${esc(String(coverage.publicPagesFetched || 0))} pages.</div>`
+          : "";
+        const engineCard = `
+          <div class="runtime-signal">
+            <div class="row">
+              <span class="risk low">engine</span>
+              <span class="small">${esc(engineText)}</span>
+            </div>
+            ${endpoint}
+            ${coverageLine}
+          </div>
+        `;
+
+        if (!signals.length) {
+          host.innerHTML = header + engineCard + "<div class='muted'>No blocking runtime alerts.</div>";
+          return;
+        }
+
+        host.innerHTML = header + engineCard + signals.map((s) => {
+          const level = s.level || "medium";
+          return `
+            <div class="runtime-signal">
+              <div class="row">
+                <span class="risk ${esc(level)}">${esc(level)}</span>
+                <span class="small"><code>${esc(s.id || "runtime_signal")}</code></span>
+              </div>
+              <div class="small">${esc(s.message || "")}</div>
+            </div>
+          `;
+        }).join("");
+      }
+
+      function renderFindings() {
+        const host = document.getElementById("findingsList");
+        const filter = document.getElementById("riskFilter").value;
+        const items = (auditData?.findings || []).filter((f) => filter === "all" ? true : f.risk === filter);
+
+        if (!items.length) {
+          host.innerHTML = "<div class='muted'>No findings match this filter.</div>";
+          return;
+        }
+
+        host.innerHTML = items.map((f) => {
+          const key = f.slug;
+          const saved = state.findings[key] || { selected: false, decision: "todo", note: "" };
+          const evidenceText = (f.evidence || []).join("\n");
+          const m = f.metrics || {};
+          const trust = computeTrustSignals(f);
+          const findingSignal = f.signalLevel || "none";
+          const signalReasons = (f.signalReasons || []).join(", ") || "none";
+          const ownerSignal = f.ownerSignalLevel || "none";
+          const ownerFlags = (f.ownerSignals || []).join(", ") || "none";
+          const ownerHandle = f.owner?.handle || "unknown";
+          const ownerProfile = ownerHandle === "unknown" ? "unknown" : "@" + ownerHandle;
+          const ownerAvatar = ownerHandle === "unknown"
+            ? ""
+            : `<img class="avatar" src="${githubAvatarUrl(ownerHandle)}" alt="${esc(ownerHandle)} avatar" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">`;
+          const emoji = ownerEmoji(ownerSignal);
+          const commentTemplate = auditData?.autoComments?.[f.reasonCode] || "";
+          const commentAction = commentTemplate
+            ? `<button type="button" class="small" data-copy-comment="${esc(key)}">Copy auto-comment</button>`
+            : `<span class="muted small">No auto-comment template</span>`;
+          return `
+            <div class="finding">
+              <div class="finding-top">
+                <div>
+                  <h3>${esc(f.displayName || f.slug)}</h3>
+                  <div class="muted owner-row">
+                    <button type="button" class="owner-button" data-owner-handle="${esc(ownerHandle)}">
+                      ${ownerAvatar}
+                      <span class="author-emoji">${esc(emoji)}</span>
+                      <span>${esc(f.slug)} by ${esc(ownerProfile)}</span>
+                    </button>
+                  </div>
+                  <div class="small muted owner-extra" data-owner-ajax="${esc(ownerHandle)}">Loading owner profile + finding summary…</div>
+                </div>
+                <span class="risk ${esc(f.risk)}">${esc(f.risk)}</span>
+              </div>
+              <div class="small">${esc(f.summary || "")}</div>
+              <div class="small">Action: <span class="pill">${esc(f.suggestedAction || "none")}</span></div>
+              <div class="small">Metrics: stars ${esc(m.stars)} | installs ${esc(m.installsAllTime)} | downloads ${esc(m.downloads)}</div>
+              <div class="small">Signal Level: <span class="risk ${esc(findingSignal)}">${esc(findingSignal)}</span> | owner <span class="risk ${esc(ownerSignal)}">${esc(ownerSignal)}</span></div>
+              <div class="small">Signals: docs ${esc(trust.docsSignal)} | releases ${esc(trust.releaseSignal)}</div>
+              <div class="small">Signal reasons: ${esc(signalReasons)}</div>
+              <div class="small">Owner flags: ${esc(ownerFlags)}</div>
+              <div class="row">${commentAction}</div>
+              <div class="small">Evidence:</div>
+              <div class="codebox">${esc(evidenceText)}</div>
+              <div class="row">
+                <label><input type="checkbox" data-fkey="${esc(key)}" data-field="selected" ${saved.selected ? "checked" : ""}> pick this</label>
+                <label>decision
+                  <select data-fkey="${esc(key)}" data-field="decision">
+                    <option value="todo" ${saved.decision === "todo" ? "selected" : ""}>todo</option>
+                    <option value="later" ${saved.decision === "later" ? "selected" : ""}>later</option>
+                    <option value="ignore" ${saved.decision === "ignore" ? "selected" : ""}>ignore</option>
+                    <option value="done" ${saved.decision === "done" ? "selected" : ""}>done</option>
+                  </select>
+                </label>
+              </div>
+              <textarea data-fkey="${esc(key)}" data-field="note" placeholder="notes">${esc(saved.note || "")}</textarea>
+            </div>
+          `;
+        }).join("");
+
+        host.querySelectorAll("[data-fkey]").forEach((el) => {
+          const key = el.dataset.fkey;
+          const field = el.dataset.field;
+          if (!state.findings[key]) state.findings[key] = { selected: false, decision: "todo", note: "" };
+          const handler = () => {
+            if (field === "selected") state.findings[key][field] = el.checked;
+            else state.findings[key][field] = el.value;
+            saveState();
+          };
+          const type = el.tagName.toLowerCase();
+          if (type === "textarea" || type === "select") el.addEventListener("input", handler);
+          else el.addEventListener("change", handler);
+        });
+
+        host.querySelectorAll("[data-copy-comment]").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const slug = btn.dataset.copyComment;
+            const finding = (auditData?.findings || []).find((x) => x.slug === slug);
+            if (!finding) return;
+            const template = auditData?.autoComments?.[finding.reasonCode];
+            if (!template) return;
+            const ok = await copyText(template);
+            const original = btn.textContent;
+            btn.textContent = ok ? "Copied" : "Copy failed";
+            setTimeout(() => {
+              btn.textContent = original;
+            }, 1200);
+          });
+        });
+
+        host.querySelectorAll("[data-owner-handle]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const handle = String(btn.dataset.ownerHandle || "");
+            if (!handle || handle === "unknown") return;
+            window.open(githubProfileUrl(handle), "_blank", "noopener,noreferrer");
+          });
+        });
+
+        hydrateOwnerAjax(items);
+      }
+
+      async function copyText(text) {
+        try {
+          if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(text);
+            return true;
+          }
+        } catch {}
+        try {
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          ta.style.position = "fixed";
+          ta.style.opacity = "0";
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          const ok = document.execCommand("copy");
+          ta.remove();
+          return !!ok;
+        } catch {
+          return false;
+        }
+      }
+
+      function hasSkillDocsRef(finding) {
+        return (finding?.evidence || []).some((p) => /\/SKILL\.md$/i.test(p));
+      }
+
+      function computeTrustSignals(finding) {
+        const versions = finding?.metrics?.versions || 0;
+        const hasDocs = hasSkillDocsRef(finding);
+        let releaseSignal = "single-release";
+        if (versions >= 4) releaseSignal = "active-iteration";
+        else if (versions >= 2) releaseSignal = "iterating";
+        return {
+          docsSignal: hasDocs ? "present" : "missing-in-sample",
+          releaseSignal
+        };
+      }
+
+      function renderTodoGuide() {
+        const host = document.getElementById("todoList");
+        const items = parseTodoItems(todoRaw);
+        if (!items.length) {
+          host.innerHTML = "<div class='muted'>No TODO rows parsed.</div>";
+          return;
+        }
+        host.innerHTML = items.map((item) => {
+          const saved = state.todos[item.id] || { selected: false, decision: "todo", note: "" };
+          return `
+            <div class="todo-item">
+              <div class="row">
+                <span class="pill ${esc(item.status)}">${esc(item.status)}</span>
+                <span class="muted">${esc(item.ts)}</span>
+              </div>
+              <div>${esc(item.text)}</div>
+              <div class="row">
+                <label><input type="checkbox" data-tkey="${esc(item.id)}" data-field="selected" ${saved.selected ? "checked" : ""}> pick this</label>
+                <label>decision
+                  <select data-tkey="${esc(item.id)}" data-field="decision">
+                    <option value="todo" ${saved.decision === "todo" ? "selected" : ""}>todo</option>
+                    <option value="later" ${saved.decision === "later" ? "selected" : ""}>later</option>
+                    <option value="ignore" ${saved.decision === "ignore" ? "selected" : ""}>ignore</option>
+                    <option value="done" ${saved.decision === "done" ? "selected" : ""}>done</option>
+                  </select>
+                </label>
+              </div>
+              <textarea data-tkey="${esc(item.id)}" data-field="note" placeholder="notes">${esc(saved.note || "")}</textarea>
+            </div>
+          `;
+        }).join("");
+
+        host.querySelectorAll("[data-tkey]").forEach((el) => {
+          const key = el.dataset.tkey;
+          const field = el.dataset.field;
+          if (!state.todos[key]) state.todos[key] = { selected: false, decision: "todo", note: "" };
+          const handler = () => {
+            if (field === "selected") state.todos[key][field] = el.checked;
+            else state.todos[key][field] = el.value;
+            saveState();
+          };
+          const type = el.tagName.toLowerCase();
+          if (type === "textarea" || type === "select") el.addEventListener("input", handler);
+          else el.addEventListener("change", handler);
+        });
+      }
+
+      function renderSources() {
+        document.getElementById("auditMdBox").textContent = auditRaw;
+        document.getElementById("todoMdBox").textContent = todoRaw;
+        document.getElementById("skillsTodoMdBox").textContent = skillsTodoRaw;
+      }
+
+      function exportSelected() {
+        const findings = Object.entries(state.findings)
+          .filter(([, v]) => v.selected)
+          .map(([k, v]) => ({ slug: k, ...v }));
+        const todos = Object.entries(state.todos)
+          .filter(([, v]) => v.selected)
+          .map(([k, v]) => ({ id: k, ...v }));
+        const suggestions = Object.entries(state.suggestions)
+          .filter(([, v]) => !!v)
+          .map(([k]) => k);
+
+        const out = {
+          exportedAt: new Date().toISOString(),
+          findings,
+          todos,
+          suggestions,
+          vhostPlan
+        };
+        const blob = new Blob([JSON.stringify(out, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "openclaw-checklist-export.json";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      function findFileByName(files, expectedName) {
+        return files.find((f) => f.name.toLowerCase() === expectedName.toLowerCase());
+      }
+
+      async function loadFromPickedFiles(fileList) {
+        const files = Array.from(fileList || []);
+        const status = [];
+
+        const jsonFile = findFileByName(files, FILES.json);
+        const todoFile = findFileByName(files, FILES.todoMd);
+        const skillsTodoFile = findFileByName(files, FILES.skillsTodoMd);
+        const auditFile = findFileByName(files, FILES.auditMd);
+
+        if (!jsonFile || !todoFile || !auditFile) {
+          setStatus([{
+            ok: false,
+            message: "Pick files: audit-findings.json, TODO.md, AUDIT.md (SKILLS-TODO.md optional)"
+          }]);
+          return;
+        }
+
+        try {
+          const raw = await fileText(jsonFile);
+          auditData = JSON.parse(raw);
+          status.push({ ok: true, message: "Loaded from file picker: " + jsonFile.name });
+        } catch (e) {
+          status.push({ ok: false, message: String(e.message || e) });
+          auditData = null;
+        }
+
+        try {
+          todoRaw = await fileText(todoFile);
+          status.push({ ok: true, message: "Loaded from file picker: " + todoFile.name });
+        } catch (e) {
+          status.push({ ok: false, message: String(e.message || e) });
+          todoRaw = "";
+        }
+
+        if (skillsTodoFile) {
+          try {
+            skillsTodoRaw = await fileText(skillsTodoFile);
+            status.push({ ok: true, message: "Loaded from file picker: " + skillsTodoFile.name });
+          } catch (e) {
+            status.push({ ok: false, message: String(e.message || e) });
+            skillsTodoRaw = "";
+          }
+        } else {
+          skillsTodoRaw = "";
+        }
+
+        try {
+          auditRaw = await fileText(auditFile);
+          status.push({ ok: true, message: "Loaded from file picker: " + auditFile.name });
+        } catch (e) {
+          status.push({ ok: false, message: String(e.message || e) });
+          auditRaw = "";
+        }
+
+        setStatus(status);
+        renderRadarBanner();
+        renderVhostList();
+        renderStats();
+        renderRailCounts();
+        renderSuggestions();
+        renderPatterns();
+        renderRuntimeSignals();
+        renderFindings();
+        renderTodoGuide();
+        renderSources();
+
+        const ts = auditData?.generatedAt || "unknown";
+        document.getElementById("metaLine").textContent = "Audit timestamp: " + ts + " | Local state key: " + STORAGE_KEY;
+      }
+
+      async function loadAll() {
+        const status = [];
+
+        const bundled = window.OPENCLAW_BROWSER_DATA;
+        if (bundled && bundled.auditFindings && typeof bundled.todoMd === "string" && typeof bundled.auditMd === "string") {
+          auditData = bundled.auditFindings;
+          todoRaw = bundled.todoMd;
+          skillsTodoRaw = typeof bundled.skillsTodoMd === "string" ? bundled.skillsTodoMd : "";
+          auditRaw = bundled.auditMd;
+          if (!localStorage.getItem(VHOST_STORAGE_KEY) && bundled.vhostPlan) {
+            vhostPlan = normalizeVhostPlan(bundled.vhostPlan);
+            saveVhostPlan();
+          }
+          status.push({ ok: true, message: "Loaded bundled data from browser-data.js" });
+
+          setStatus(status);
+          renderRadarBanner();
+          renderVhostList();
+          renderStats();
+          renderRailCounts();
+          renderSuggestions();
+          renderPatterns();
+          renderRuntimeSignals();
+          renderFindings();
+          renderTodoGuide();
+          renderSources();
+
+          const ts = auditData?.generatedAt || "unknown";
+          document.getElementById("metaLine").textContent = "Audit timestamp: " + ts + " | source: bundled file | Local state key: " + STORAGE_KEY;
+          return;
+        }
+
+        try {
+          auditData = await getJson(FILES.json);
+          status.push({ ok: true, message: "Loaded " + FILES.json });
+        } catch (e) {
+          status.push({ ok: false, message: String(e.message || e) });
+          auditData = null;
+        }
+
+        try {
+          todoRaw = await getText(FILES.todoMd);
+          status.push({ ok: true, message: "Loaded " + FILES.todoMd });
+        } catch (e) {
+          status.push({ ok: false, message: String(e.message || e) });
+          todoRaw = "";
+        }
+
+        try {
+          skillsTodoRaw = await getText(FILES.skillsTodoMd);
+          status.push({ ok: true, message: "Loaded " + FILES.skillsTodoMd });
+        } catch (e) {
+          status.push({ ok: false, message: String(e.message || e) });
+          skillsTodoRaw = "";
+        }
+
+        try {
+          auditRaw = await getText(FILES.auditMd);
+          status.push({ ok: true, message: "Loaded " + FILES.auditMd });
+        } catch (e) {
+          status.push({ ok: false, message: String(e.message || e) });
+          auditRaw = "";
+        }
+
+        if (!localStorage.getItem(VHOST_STORAGE_KEY)) {
+          try {
+            const vhostPayload = await getJson(FILES.vhostPlan);
+            vhostPlan = normalizeVhostPlan(vhostPayload);
+            saveVhostPlan();
+            status.push({ ok: true, message: "Loaded " + FILES.vhostPlan });
+          } catch (e) {
+            status.push({ ok: false, message: String(e.message || e) });
+          }
+        }
+
+        setStatus(status);
+        renderRadarBanner();
+        renderVhostList();
+        renderStats();
+        renderRailCounts();
+        renderSuggestions();
+        renderPatterns();
+        renderRuntimeSignals();
+        renderFindings();
+        renderTodoGuide();
+        renderSources();
+
+        const ts = auditData?.generatedAt || "unknown";
+        document.getElementById("metaLine").textContent = "Audit timestamp: " + ts + " | Local state key: " + STORAGE_KEY;
+      }
+
+      document.getElementById("reloadBtn").addEventListener("click", loadAll);
+      document.getElementById("exportBtn").addEventListener("click", exportSelected);
+      document.getElementById("riskFilter").addEventListener("change", renderFindings);
+      document.getElementById("manualLoadBtn").addEventListener("click", () => {
+        document.getElementById("filePicker").click();
+      });
+      document.getElementById("filePicker").addEventListener("change", (e) => {
+        loadFromPickedFiles(e.target.files);
+      });
+
+      const bootSplash = document.getElementById("bootSplash");
+      setTimeout(() => {
+        bootSplash.classList.add("hidden");
+      }, 1700);
+
+      vhostPlan = loadVhostPlan();
+      wireVhostControls();
+      resetVhostForm();
+      renderVhostList();
+      setupTheme();
+      loadAll();
+    </script>
+  </body>
+</html>

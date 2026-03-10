@@ -1,0 +1,114 @@
+{
+  "version": "0.5.0",
+  "generatedAt": "2026-03-06T01:00:02+00:00",
+  "inputs": {
+    "snapshotGeneratedAt": "2026-03-06T01:00:02+00:00",
+    "vhostPlanVersion": "0.5.0"
+  },
+  "policy": {
+    "requireIpv6": true,
+    "preferLowestCost": true,
+    "maxMonthlyCostUsd": null,
+    "freeTierThresholdUsd": 0.5
+  },
+  "summary": {
+    "targetCount": 2,
+    "ipv6ReadyCount": 0,
+    "migrationReadyCount": 0,
+    "cheapestKnownMonthlyCostUsd": null
+  },
+  "recommendedTarget": {
+    "id": "net30-main-oci",
+    "label": "Net30 Main OCI",
+    "ociProfile": "DEFAULT",
+    "region": "us-ashburn-1",
+    "host": "",
+    "ipv4": "",
+    "ipv6": "",
+    "ipv6Ready": false,
+    "hostReady": false,
+    "ociAuthOk": false,
+    "profileKnown": true,
+    "effectiveMonthlyCostUsd": null,
+    "freeOrNearFree": false,
+    "sshUser": "ubuntu",
+    "sshPort": 22,
+    "sshKeyPath": "/System/Volumes/Data/Projects/vhost-m1/keys/m1_vhost_ed25519",
+    "notes": "Primary Net30 target.",
+    "blockers": [
+      "missing_ipv6",
+      "oci_profile_auth_failed",
+      "missing_host_or_ip",
+      "ssh_key_not_in_projects_root"
+    ],
+    "migrationReady": false
+  },
+  "rankedTargets": [
+    {
+      "id": "net30-main-oci",
+      "label": "Net30 Main OCI",
+      "ociProfile": "DEFAULT",
+      "region": "us-ashburn-1",
+      "host": "",
+      "ipv4": "",
+      "ipv6": "",
+      "ipv6Ready": false,
+      "hostReady": false,
+      "ociAuthOk": false,
+      "profileKnown": true,
+      "effectiveMonthlyCostUsd": null,
+      "freeOrNearFree": false,
+      "sshUser": "ubuntu",
+      "sshPort": 22,
+      "sshKeyPath": "/System/Volumes/Data/Projects/vhost-m1/keys/m1_vhost_ed25519",
+      "notes": "Primary Net30 target.",
+      "blockers": [
+        "missing_ipv6",
+        "oci_profile_auth_failed",
+        "missing_host_or_ip",
+        "ssh_key_not_in_projects_root"
+      ],
+      "migrationReady": false
+    },
+    {
+      "id": "rick74-oci",
+      "label": "Rick74 OCI",
+      "ociProfile": "rick74",
+      "region": "",
+      "host": "",
+      "ipv4": "",
+      "ipv6": "",
+      "ipv6Ready": false,
+      "hostReady": false,
+      "ociAuthOk": false,
+      "profileKnown": true,
+      "effectiveMonthlyCostUsd": null,
+      "freeOrNearFree": false,
+      "sshUser": "ubuntu",
+      "sshPort": 22,
+      "sshKeyPath": "/System/Volumes/Data/Projects/vhost-m1/keys/m1_vhost_ed25519",
+      "notes": "Secondary tenancy target.",
+      "blockers": [
+        "missing_ipv6",
+        "oci_profile_auth_failed",
+        "missing_host_or_ip",
+        "ssh_key_not_in_projects_root"
+      ],
+      "migrationReady": false
+    }
+  ],
+  "ipv6Targets": [],
+  "projects": [
+    {
+      "id": "skillarmor-site",
+      "domain": "skillarmor.org",
+      "recommendedTargetId": "net30-main-oci",
+      "recommendedTargetLabel": "Net30 Main OCI",
+      "targetRoot": "/var/www/skillarmor",
+      "commands": {
+        "syncContentRsync": "rsync -az --delete -e 'ssh -p 22' <LOCAL_SITE_DIR>/ ubuntu@<target-host>:/var/www/skillarmor/",
+        "remoteNginxTestReload": "ssh -p 22 ubuntu@<target-host> 'sudo nginx -t && sudo systemctl reload nginx'"
+      }
+    }
+  ]
+}

@@ -1,0 +1,169 @@
+{
+  "scanMode": "prefer_local",
+  "api": {
+    "baseUrl": "https://api.opencode.ai",
+    "endpoint": "/v1/audit/scan",
+    "apiKey": ""
+  },
+  "fallback": {
+    "enabled": true,
+    "provider": "auto",
+    "baseUrl": "http://127.0.0.1",
+    "model": "gpt-oss-20b-Q4_K_M.gguf",
+    "modelPreferences": [
+      "gpt-oss-20b-Q4_K_M.gguf",
+      "Meta-Llama-3.1-8B-Instruct-Q6_K.gguf",
+      "Mistral-7B-Instruct-v0.3-Q4_K_M.gguf",
+      "Phi-3.5-mini-instruct.Q8_0.gguf"
+    ],
+    "timeoutSeconds": 180,
+    "maxTokens": 2800,
+    "discoveryPorts": [1234, 11434, 8080],
+    "autoRepair": true
+  },
+  "request": {
+    "runName": "clawhub-trust-growth-scan",
+    "goal": "Expand risky-skill coverage and prioritize high-impact review targets",
+    "personaOS": {
+      "packName": "AI Persona OS // Matrix Operator Pack",
+      "defaultOperator": "Agent Smith",
+      "operators": [
+        {
+          "name": "Morpheus",
+          "role": "Mission control and strategy framing",
+          "directive": "Free your mind, then prioritize impact over noise."
+        },
+        {
+          "name": "Trinity",
+          "role": "Execution and precision follow-through",
+          "directive": "Resolve top risk findings fast and clean."
+        },
+        {
+          "name": "Agent Smith",
+          "role": "Audit hard-truth mode",
+          "directive": "Assume bypass attempts; verify with evidence."
+        },
+        {
+          "name": "Oracle",
+          "role": "Quality gate and clarity",
+          "directive": "Do not publish conclusions without proof."
+        },
+        {
+          "name": "Seraph",
+          "role": "Security and integrity guardrails",
+          "directive": "Prefer least privilege and safe defaults."
+        },
+        {
+          "name": "Dozer",
+          "role": "Maintenance and continuity",
+          "directive": "Keep SKILLS-TODO current each cycle."
+        }
+      ],
+      "workflow": [
+        "Morpheus defines scan scope",
+        "Smith audits findings",
+        "Seraph checks security risk",
+        "Oracle quality-gates comments",
+        "Trinity executes fix/comment tasks",
+        "Dozer updates SKILLS-TODO and rerun cadence"
+      ]
+    },
+    "search": {
+      "queries": [
+        "shell",
+        "terminal",
+        "exec",
+        "command",
+        "bash",
+        "tmux",
+        "token",
+        "wallet",
+        "swap",
+        "bridge",
+        "pump",
+        "solana",
+        "ethereum",
+        "api key",
+        "secret",
+        "env",
+        "auth",
+        "oauth",
+        "session",
+        "browser",
+        "scrape",
+        "puppeteer",
+        "playwright",
+        "automation",
+        "ssh",
+        "remote",
+        "agent",
+        "sub-agent",
+        "orchestrator"
+      ],
+      "maxResultsPerQuery": 150,
+      "dedupeBy": ["slug"],
+      "includeMetadata": true
+    },
+    "ownerExpansion": {
+      "enabled": true,
+      "seedFromFlaggedOwners": true,
+      "maxSkillsPerOwner": 40
+    },
+    "riskSignals": {
+      "high": [
+        "child_process.exec",
+        "execSync",
+        "spawn",
+        "tmux send-keys",
+        "eval(",
+        "curl | bash",
+        "wget | sh",
+        "chmod +x",
+        "sudo ",
+        "rm -rf",
+        "/dev/tcp"
+      ],
+      "medium": [
+        "process.argv.*(key|token|secret)",
+        "API key passed as CLI arg",
+        "writes secret to file",
+        "stores token unencrypted"
+      ],
+      "operational": [
+        "on-chain trade",
+        "deploy token",
+        "wallet transfer",
+        "private key import"
+      ],
+      "defensive": [
+        "allowlist",
+        "dry-run",
+        "explicit confirmation",
+        "least privilege",
+        "security scanner"
+      ]
+    },
+    "cloneDetection": {
+      "hashFiles": ["handler.js", "index.js", "SKILL.md"],
+      "textSimilarityThreshold": 0.9,
+      "flagCrossOwnerClones": true
+    },
+    "scoring": {
+      "riskWeight": 0.65,
+      "exposureWeight": 0.35,
+      "exposure": {
+        "installsAllTime": 0.5,
+        "downloads": 0.3,
+        "stars": 0.2
+      }
+    },
+    "outputs": {
+      "auditMarkdown": "docs/AUDIT.md",
+      "auditJson": "data/audit-findings.json",
+      "skillsTodo": "docs/SKILLS-TODO.md",
+      "topN": 100,
+      "includeAutoCommentTemplate": true,
+      "includeOwnerRepeatPattern": true
+    }
+  }
+}

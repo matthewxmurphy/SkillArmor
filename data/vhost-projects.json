@@ -1,0 +1,23 @@
+{
+  "version": "0.5.0",
+  "defaults": {
+    "acmeWebroot": "/var/www/letsencrypt"
+  },
+  "projects": [
+    {
+      "id": "skillarmor-site",
+      "name": "SkillArmor",
+      "domain": "skillarmor.org",
+      "aliases": [
+        "www.skillarmor.org"
+      ],
+      "type": "static",
+      "root": "/var/www/skillarmor",
+      "index": "index.html",
+      "spa": true,
+      "forceHttps": true,
+      "tls": "letsencrypt",
+      "enabled": true
+    }
+  ]
+}

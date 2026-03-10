@@ -1,0 +1,9 @@
+{
+  "enabled": false,
+  "host": "YOUR_ORACLE_HOST_OR_IP",
+  "port": 22,
+  "user": "ubuntu",
+  "sshKeyPath": "",
+  "remoteSiteDir": "/var/www/skillarmor",
+  "feedOnly": true
+}

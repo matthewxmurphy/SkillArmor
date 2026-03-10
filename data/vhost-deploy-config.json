@@ -1,0 +1,17 @@
+{
+  "enabled": false,
+  "host": "YOUR_SERVER_IP_OR_DNS",
+  "port": 22,
+  "user": "ubuntu",
+  "sshKeyPath": "/System/Volumes/Data/Projects/vhost-m1/keys/m1_vhost_ed25519",
+  "projectsKeyRoot": "/System/Volumes/Data/Projects",
+  "requireProjectsKeyRoot": true,
+  "remoteTempDir": "~/.openclaw-vhost-sync",
+  "remoteSitesAvailableDir": "/etc/nginx/sites-available",
+  "remoteSitesEnabledDir": "/etc/nginx/sites-enabled",
+  "remoteAcmeWebroot": "/var/www/letsencrypt",
+  "testCommand": "sudo nginx -t",
+  "reloadCommand": "sudo systemctl reload nginx",
+  "autoCertbot": false,
+  "certbotEmail": "hello@matthewxmurphy.com"
+}

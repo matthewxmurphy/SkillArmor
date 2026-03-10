@@ -1,0 +1,17 @@
+.DS_Store
+Icon*
+
+__pycache__/
+*.py[cod]
+
+logs/
+output/
+
+data/big-pickel-search-config.json
+data/*-last-response.json
+data/*-scan-status.json
+data/*-snapshot.json
+data/comment-post-queue.json
+data/codex-vhost-handoff.json
+data/github-owner-cache.json
+data/websites-sftp-accounts.json
