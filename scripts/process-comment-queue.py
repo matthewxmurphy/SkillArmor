@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Generate and process queued ClawHub comment write-ups."""
+"""Generate and process queued ClawHub comment write-ups.
+
+Copyright (c) 2026 Matthew X Murphy, https://MatthewxMurphy.com.
+Product: https://builtnotbegged.com. Existing distribution rights retained.
+"""
 
 from __future__ import annotations
 
@@ -7,6 +11,10 @@ import argparse
 import base64
 import json
 import subprocess
+import shlex
+import os
+import fcntl
+from contextlib import contextmanager
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -31,12 +39,23 @@ def load_json(path: Path, default: Any) -> Any:
         return default
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return default
+    except json.JSONDecodeError as error:
+        raise ValueError("Malformed persisted JSON requires owner repair") from error
 
 
 def save_json(path: Path, payload: Any) -> None:
-    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    if path.is_symlink():
+        raise ValueError("Queue symlinks are not supported")
+    descriptor, temporary = tempfile.mkstemp(prefix=".comment-queue-", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as output:
+            output.write(json.dumps(payload, indent=2, ensure_ascii=False) + "\n")
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
 
 
 def docs_present(finding: dict[str, Any]) -> bool:
@@ -169,6 +188,8 @@ def generate_queue(
     min_signal: str,
 ) -> dict[str, Any]:
     existing = load_json(queue_path, {})
+    if not isinstance(existing, dict) or (queue_path.exists() and (not isinstance(existing.get("items"), list) or any(not isinstance(row, dict) or not row.get("id") for row in existing["items"]))):
+        raise ValueError("Malformed persisted queue requires owner repair")
     old_items = existing.get("items", []) if isinstance(existing.get("items"), list) else []
     old_map = {
         str(item.get("id")): item for item in old_items if isinstance(item, dict) and item.get("id")
@@ -184,6 +205,9 @@ def generate_queue(
     for finding in selected:
         item_id = queue_item_id(finding)
         prior = old_map.get(item_id, {})
+        if prior and (prior.get("status") != "queued" or int(prior.get("attempts", 0) or 0) > 0):
+            items.append(prior)  # Attempts freeze exact text and reconciliation evidence.
+            continue
         reason = str(finding.get("reasonCode", ""))
         template = str(templates.get(reason, ""))
         texts = build_comment_texts(finding, template)
@@ -215,6 +239,10 @@ def generate_queue(
             }
         )
 
+    selected_ids = {row["id"] for row in items}
+    items.extend(row for row in old_items if row["id"] not in selected_ids and (row.get("status") != "queued" or int(row.get("attempts", 0) or 0) > 0))
+    if len(items) > 10000:
+        raise ValueError("Queue history capacity requires owner archival; receipts cannot be evicted")
     payload = {
         "generatedAt": iso(now),
         "sourceAuditGeneratedAt": audit_payload.get("generatedAt"),
@@ -273,42 +301,74 @@ def render_markdown(queue_payload: dict[str, Any]) -> str:
 
 
 def run_post_command(command_template: str, item: dict[str, Any]) -> tuple[bool, str]:
-    comment = item.get("comment", {}) if isinstance(item.get("comment"), dict) else {}
-    body = str(comment.get("combined", "")).strip()
+    """Fixed trusted executable, inert argument substitutions, no shell evaluation.
+
+    The adapter must reconcile provider delivery and return a JSON receipt.
+    Timeout/nonzero/malformed output is uncertain, never automatic retry authority.
+    """
+    body = str((item.get("comment") or {}).get("combined", "")).strip()
     if not body:
         return False, "empty_comment_body"
+    try:
+        command = shlex.split(command_template)
+    except ValueError:
+        return False, "invalid_adapter_arguments"
+    if not command or not Path(command[0]).is_absolute() or "{" in command[0]:
+        return False, "absolute_fixed_executable_required"
+    if Path(command[0]).name in {"sh", "bash", "dash", "zsh", "fish", "cmd", "powershell", "pwsh"} or any(arg in {"-c", "-e", "--eval", "-Command"} for arg in command[1:]):
+        return False, "shell_or_eval_adapter_denied"
+    comment_file = None
+    try:
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, suffix=".md") as tf:
+            tf.write(body + "\n")
+            comment_file = tf.name
+        fields = dict(slug=str(item.get("slug", "")), owner=str(item.get("owner", "")),
+            comment_file=comment_file, comment_text=body,
+            comment_text_b64=base64.b64encode(body.encode()).decode("ascii"))
+        argv = [command[0]] + [arg.format(**fields) for arg in command[1:]]
+        result = subprocess.run(argv, shell=False, text=True, capture_output=True, timeout=120)
+        if result.returncode != 0:
+            return False, "adapter_outcome_uncertain"
+        receipt = json.loads(result.stdout)
+        if not isinstance(receipt, dict) or receipt.get("confirmed") is not True or not isinstance(receipt.get("receipt_id"), str) or not 1 <= len(receipt["receipt_id"]) <= 200:
+            return False, "adapter_confirmation_missing"
+        return True, json.dumps({"confirmed": True, "receipt_id": receipt["receipt_id"]})
+    except (ValueError, KeyError, OSError, subprocess.SubprocessError):
+        return False, "adapter_outcome_uncertain"
+    finally:
+        if comment_file is not None:
+            if os.path.exists(comment_file):
+                os.unlink(comment_file)
 
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, suffix=".md") as tf:
-        tf.write(body + "\n")
-        comment_file = tf.name
 
-    expanded = command_template.format(
-        slug=item.get("slug", ""),
-        owner=item.get("owner", ""),
-        comment_file=comment_file,
-        comment_text=body.replace("\n", " "),
-        comment_text_b64=base64.b64encode(body.encode("utf-8")).decode("ascii"),
-    )
-    result = subprocess.run(expanded, shell=True, text=True, capture_output=True, timeout=120)
-    if result.returncode == 0:
-        return True, (result.stdout or "posted").strip()
-    err = (result.stderr or result.stdout or "").strip()
-    return False, err or f"post_command_failed_exit_{result.returncode}"
+@contextmanager
+def queue_lock(path: Path):
+    """One local worker owns generation plus delivery; lock files contain no data."""
+    descriptor = os.open(str(path) + ".lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        yield
+    finally:
+        os.close(descriptor)
 
 
-def process_queue(queue_payload: dict[str, Any], queue_path: Path, max_posts: int, post_command: str) -> dict[str, Any]:
+def _process_queue(queue_payload: dict[str, Any], queue_path: Path, max_posts: int, post_command: str) -> dict[str, Any]:
     items = queue_payload.get("items", [])
     if not isinstance(items, list):
         return queue_payload
 
     now = now_utc()
     posted = 0
+    attempted = 0
     for item in items:
         if not isinstance(item, dict):
             continue
-        if posted >= max_posts:
+        if attempted >= max_posts:
             break
-        if str(item.get("status", "queued")) == "posted":
+        if item.get("status") == "posting":
+            item["status"] = "uncertain"
+            item["lastError"] = "interrupted_adapter_requires_owner_reconciliation"
+        if str(item.get("status", "queued")) != "queued":
             continue
         next_attempt = item.get("nextAttemptAt")
         if isinstance(next_attempt, str):
@@ -328,8 +388,11 @@ def process_queue(queue_payload: dict[str, Any], queue_path: Path, max_posts: in
             item["updatedAt"] = iso(now)
             continue
 
-        ok, info = run_post_command(post_command, item)
+        attempted += 1
+        item["status"] = "posting"
         item["attempts"] = int(item.get("attempts", 0) or 0) + 1
+        save_json(queue_path, queue_payload)
+        ok, info = run_post_command(post_command, item)
         item["updatedAt"] = iso(now)
         if ok:
             posted += 1
@@ -338,14 +401,20 @@ def process_queue(queue_payload: dict[str, Any], queue_path: Path, max_posts: in
             item["lastError"] = None
             item["postReceipt"] = info
         else:
-            item["status"] = "queued"
+            item["status"] = "uncertain"
             item["lastError"] = info
             item["nextAttemptAt"] = iso(now + timedelta(minutes=30))
 
     queue_payload["processedAt"] = iso(now)
-    queue_payload["postStats"] = {"postedThisRun": posted, "maxPostsPerRun": max_posts}
+    queue_payload["postStats"] = {"postedThisRun": posted, "attemptedThisRun": attempted, "maxPostsPerRun": max_posts}
     save_json(queue_path, queue_payload)
     return queue_payload
+
+
+def process_queue(queue_payload, queue_path, max_posts, post_command):
+    with queue_lock(queue_path):
+        durable = load_json(queue_path, queue_payload)
+        return _process_queue(durable, queue_path, max_posts, post_command)
 
 
 def main() -> None:
@@ -365,25 +434,26 @@ def main() -> None:
     queue_path = root / args.queue
     comments_md_path = root / args.comments_md
 
-    audit_payload = load_json(audit_path, {})
-    if not isinstance(audit_payload, dict):
-        raise SystemExit(f"Invalid audit payload: {audit_path}")
+    with queue_lock(queue_path):
+        audit_payload = load_json(audit_path, {})
+        if not isinstance(audit_payload, dict):
+            raise SystemExit(f"Invalid audit payload: {audit_path}")
 
-    queue_payload = generate_queue(audit_payload, queue_path, max(1, int(args.limit)), args.min_signal)
-    if args.process:
-        queue_payload = process_queue(
-            queue_payload,
-            queue_path,
-            max(1, int(args.max_posts)),
-            str(args.post_command or "").strip(),
-        )
+        queue_payload = generate_queue(audit_payload, queue_path, max(1, int(args.limit)), args.min_signal)
+        if args.process:
+            queue_payload = _process_queue(
+                queue_payload,
+                queue_path,
+                max(1, int(args.max_posts)),
+                str(args.post_command or "").strip(),
+            )
 
-    comments_md_path.write_text(render_markdown(queue_payload), encoding="utf-8")
-    print(f"Updated queue: {queue_path}")
-    print(f"Updated comments: {comments_md_path}")
-    if args.process:
-        stats = queue_payload.get("postStats", {})
-        print(f"Queue processing: posted {stats.get('postedThisRun', 0)} item(s)")
+        comments_md_path.write_text(render_markdown(queue_payload), encoding="utf-8")
+        print(f"Updated queue: {queue_path}")
+        print(f"Updated comments: {comments_md_path}")
+        if args.process:
+            stats = queue_payload.get("postStats", {})
+            print(f"Queue processing: posted {stats.get('postedThisRun', 0)} item(s)")
 
 
 if __name__ == "__main__":
