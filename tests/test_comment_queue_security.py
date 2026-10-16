@@ -6,6 +6,8 @@ import importlib.util
 import json
 from pathlib import Path
 import subprocess
+import sys
+import shlex
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -21,26 +23,62 @@ class QueueTests(unittest.TestCase):
         captured = {}
         def adapter(argv, **options):
             captured.update(argv=argv, options=options)
-            self.assertTrue(Path(argv[-1]).is_file())
-            self.assertEqual(Path(argv[-1]).stat().st_mode & 0o777, 0o600)
+            self.assertTrue(Path(argv[-1].split("=", 1)[1]).is_file())
+            self.assertEqual(Path(argv[-1].split("=", 1)[1]).stat().st_mode & 0o777, 0o600)
             return subprocess.CompletedProcess(argv, 0, '{"confirmed":true,"receipt_id":"synthetic-receipt"}', '')
         original = item()
         with patch.object(worker.subprocess, "run", adapter):
-            ok, info = worker.run_post_command('/usr/local/bin/owned-adapter --slug "{slug}" --text "{comment_text}" --file {comment_file}', original)
+            ok, info = worker.run_post_command('/usr/local/bin/owned-adapter --slug "{slug}" --owner "{owner}" --body-file {comment_file}', original)
         self.assertTrue(ok)
         self.assertFalse(captured["options"]["shell"])
-        self.assertEqual(captured["argv"][2], original["slug"])
-        self.assertEqual(captured["argv"][4], original["comment"]["combined"])
-        self.assertFalse(Path(captured["argv"][-1]).exists())
+        self.assertEqual(captured["argv"][1], "--slug=" + original["slug"])
+        self.assertEqual(captured["argv"][2], "--owner=" + original["owner"])
+        self.assertFalse(Path(captured["argv"][-1].split("=", 1)[1]).exists())
     def test_shell_and_eval_and_dynamic_executables_denied(self):
         for command in ['sh -c "{comment_text}"', '/bin/sh -c "{comment_text}"', '/usr/bin/python3 -c "{comment_text}"', '{slug} --body {comment_file}']:
             with patch.object(worker.subprocess, "run") as run:
                 self.assertFalse(worker.run_post_command(command, item())[0])
                 run.assert_not_called()
+    def test_formatted_program_script_and_option_positions_fail_closed(self):
+        commands = [
+            '{slug} --body-file {comment_file}',
+            shlex.quote(sys.executable) + ' {slug} {owner} --body-file {comment_file}',
+            shlex.quote(sys.executable) + ' /trusted/adapter.py {slug} {owner} --body-file {comment_file}',
+            '/usr/bin/node {owner} --body-file {comment_file}',
+            '/usr/bin/node /trusted/adapter.js --eval {slug} --body-file {comment_file}',
+            '/usr/local/bin/owned-adapter --slug {comment_text} --body-file {comment_file}',
+            '/usr/local/bin/owned-adapter --body-file {slug}',
+        ]
+        for command in commands:
+            for slug in ['-c', '--eval', '/tmp/dynamic-adapter.py']:
+                candidate = item(); candidate.update(slug=slug, owner='untrusted program source')
+                with self.subTest(command=command, slug=slug), patch.object(worker.subprocess, 'run') as run:
+                    self.assertFalse(worker.run_post_command(command, candidate)[0])
+                    run.assert_not_called()
+
+    def test_native_fixed_python_adapter_receives_leading_options_only_as_data(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td); adapter = root/'adapter.py'; evidence = root/'arguments.json'; marker = root/'never-created'
+            adapter.write_text('import json,sys\nfrom pathlib import Path\n'
+                'args=dict(arg.split("=",1) for arg in sys.argv[1:])\n'
+                'body=Path(args["--body-file"]).read_text()\n'
+                'Path('+repr(str(evidence))+').write_text(json.dumps({"args":args,"body":body}))\n'
+                'print(json.dumps({"confirmed":True,"receipt_id":"local-synthetic"}))\n')
+            command = shlex.quote(sys.executable)+' '+shlex.quote(str(adapter))+' --slug {slug} --owner {owner} --body-file {comment_file}'
+            candidate = item(); candidate.update(slug='-c', owner='--eval')
+            candidate['comment']['combined'] = 'from pathlib import Path; Path('+repr(str(marker))+').touch()'
+            self.assertTrue(worker.run_post_command(command, candidate)[0])
+            received = json.loads(evidence.read_text())
+            self.assertEqual(received['args']['--slug'], '-c')
+            self.assertEqual(received['args']['--owner'], '--eval')
+            self.assertEqual(received['body'].strip(), candidate['comment']['combined'])
+            self.assertFalse(marker.exists())
+            self.assertFalse(Path(received['args']['--body-file']).exists())
+
     def test_failed_adapter_and_unconfirmed_success_are_uncertain(self):
         for response in [subprocess.CompletedProcess([], 1, '', 'private error'), subprocess.CompletedProcess([], 0, 'posted', ''), subprocess.CompletedProcess([], 0, '{"confirmed":false}', '')]:
             with patch.object(worker.subprocess, "run", return_value=response):
-                self.assertFalse(worker.run_post_command('/usr/local/bin/owned-adapter {comment_file}', item())[0])
+                self.assertFalse(worker.run_post_command('/usr/local/bin/owned-adapter --body-file {comment_file}', item())[0])
     def test_uncertain_delivery_is_durable_and_never_auto_retried(self):
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / "queue.json"; payload = {"items": [item()]}

@@ -8,7 +8,7 @@ Product: https://builtnotbegged.com. Existing distribution rights retained.
 from __future__ import annotations
 
 import argparse
-import base64
+import re
 import json
 import subprocess
 import shlex
@@ -300,32 +300,72 @@ def render_markdown(queue_payload: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def run_post_command(command_template: str, item: dict[str, Any]) -> tuple[bool, str]:
-    """Fixed trusted executable, inert argument substitutions, no shell evaluation.
+def adapter_arguments(template: str) -> tuple[list[str], list[tuple[str, str]]]:
+    """Admit a trusted execution prefix and a closed data-only adapter protocol.
 
-    The adapter must reconcile provider delivery and return a JSON receipt.
+    Untrusted fields cannot select executables, scripts, switches or positional
+    arguments. Values become --key=value tokens so leading dashes stay data.
+    Operators own the executable/script and must keep those files trusted.
+    """
+    command = shlex.split(template)
+    if not command or not Path(command[0]).is_absolute() or any(c in command[0] for c in "{}"):
+        raise ValueError("absolute_fixed_executable_required")
+    name = Path(command[0]).name.lower()
+    if name in {"sh", "bash", "dash", "zsh", "fish", "cmd", "powershell", "pwsh", "env", "xargs", "sudo"}:
+        raise ValueError("shell_or_launcher_adapter_denied")
+    prefix = command[:1]
+    remaining = command[1:]
+    if re.fullmatch(r"python(?:[0-9]+(?:\.[0-9]+)*)?", name) or name in {"node", "nodejs"}:
+        # No interpreter flags, module execution or dynamic program selection.
+        if not remaining or not Path(remaining[0]).is_absolute() or any(c in remaining[0] for c in "{}"):
+            raise ValueError("fixed_absolute_adapter_script_required")
+        suffixes = {".py"} if name.startswith("python") else {".js", ".mjs", ".cjs"}
+        if Path(remaining[0]).suffix not in suffixes:
+            raise ValueError("adapter_script_type_required")
+        prefix.append(remaining.pop(0))
+    allowed = {"--slug": "{slug}", "--owner": "{owner}",
+               "--comment-file": "{comment_file}", "--body-file": "{comment_file}"}
+    pairs = []
+    seen = set()
+    while remaining:
+        token = remaining.pop(0)
+        if "=" in token:
+            key, value = token.split("=", 1)
+        else:
+            key = token
+            if not remaining:
+                raise ValueError("adapter_data_value_required")
+            value = remaining.pop(0)
+        if key not in allowed or value != allowed[key] or key in seen:
+            raise ValueError("unsupported_adapter_argument")
+        seen.add(key)
+        pairs.append((key, value[1:-1]))
+    if not seen.intersection({"--comment-file", "--body-file"}):
+        raise ValueError("private_comment_file_required")
+    return prefix, pairs
+
+
+def run_post_command(command_template: str, item: dict[str, Any]) -> tuple[bool, str]:
+    """Run only the fixed adapter prefix plus data; require provider receipt.
+
     Timeout/nonzero/malformed output is uncertain, never automatic retry authority.
+    Arbitrary comment text is passed only through a private temporary file.
     """
     body = str((item.get("comment") or {}).get("combined", "")).strip()
     if not body:
         return False, "empty_comment_body"
     try:
-        command = shlex.split(command_template)
+        prefix, arguments = adapter_arguments(command_template)
     except ValueError:
         return False, "invalid_adapter_arguments"
-    if not command or not Path(command[0]).is_absolute() or "{" in command[0]:
-        return False, "absolute_fixed_executable_required"
-    if Path(command[0]).name in {"sh", "bash", "dash", "zsh", "fish", "cmd", "powershell", "pwsh"} or any(arg in {"-c", "-e", "--eval", "-Command"} for arg in command[1:]):
-        return False, "shell_or_eval_adapter_denied"
     comment_file = None
     try:
         with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, suffix=".md") as tf:
             tf.write(body + "\n")
             comment_file = tf.name
         fields = dict(slug=str(item.get("slug", "")), owner=str(item.get("owner", "")),
-            comment_file=comment_file, comment_text=body,
-            comment_text_b64=base64.b64encode(body.encode()).decode("ascii"))
-        argv = [command[0]] + [arg.format(**fields) for arg in command[1:]]
+                      comment_file=comment_file)
+        argv = prefix + [key + "=" + fields[field] for key, field in arguments]
         result = subprocess.run(argv, shell=False, text=True, capture_output=True, timeout=120)
         if result.returncode != 0:
             return False, "adapter_outcome_uncertain"
