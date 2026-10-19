@@ -1,12 +1,20 @@
 #!/usr/bin/env python3
-"""Generate and process queued ClawHub comment write-ups."""
+"""Generate and process queued ClawHub comment write-ups.
+
+Copyright (c) 2026 Matthew X Murphy, https://MatthewxMurphy.com.
+Product: https://builtnotbegged.com. Existing distribution rights retained.
+"""
 
 from __future__ import annotations
 
 import argparse
-import base64
+import re
 import json
 import subprocess
+import shlex
+import os
+import fcntl
+from contextlib import contextmanager
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -31,12 +39,31 @@ def load_json(path: Path, default: Any) -> Any:
         return default
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return default
+    except json.JSONDecodeError as error:
+        raise ValueError("Malformed persisted JSON requires owner repair") from error
 
 
 def save_json(path: Path, payload: Any) -> None:
-    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    if path.is_symlink():
+        raise ValueError("Queue symlinks are not supported")
+    descriptor, temporary = tempfile.mkstemp(prefix=".comment-queue-", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as output:
+            output.write(json.dumps(payload, indent=2, ensure_ascii=False) + "\n")
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary, path)
+        # The rename is a separate durability boundary from the file contents.
+        # A claim may authorize an adapter only after its directory entry has
+        # also been synchronized; unsupported/failed sync must abort the run.
+        directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
 
 
 def docs_present(finding: dict[str, Any]) -> bool:
@@ -162,14 +189,34 @@ def should_include(finding: dict[str, Any], min_signal: str) -> bool:
     return SIGNAL_RANK.get(signal, 0) >= SIGNAL_RANK.get(min_signal, 2)
 
 
+def validated_queue_items(payload: Any) -> list[dict[str, Any]]:
+    """Require one durable record per item before generation or delivery.
+
+    Duplicate identities can carry conflicting attempts/receipts, so persisted
+    duplicates require owner reconciliation rather than merging or posting both.
+    Validation finishes before callers mutate state or invoke an adapter.
+    """
+    if not isinstance(payload, dict) or not isinstance(payload.get("items"), list):
+        raise ValueError("Malformed persisted queue requires owner repair")
+    seen: set[str] = set()
+    for row in payload["items"]:
+        item_id = row.get("id") if isinstance(row, dict) else None
+        if not isinstance(item_id, str) or not item_id.strip():
+            raise ValueError("Queue items require nonempty string identities")
+        if item_id in seen:
+            raise ValueError("Duplicate queue identities require owner reconciliation")
+        seen.add(item_id)
+    return payload["items"]
+
+
 def generate_queue(
     audit_payload: dict[str, Any],
     queue_path: Path,
     limit: int,
     min_signal: str,
 ) -> dict[str, Any]:
-    existing = load_json(queue_path, {})
-    old_items = existing.get("items", []) if isinstance(existing.get("items"), list) else []
+    existing = load_json(queue_path, {"items": []})
+    old_items = validated_queue_items(existing)
     old_map = {
         str(item.get("id")): item for item in old_items if isinstance(item, dict) and item.get("id")
     }
@@ -177,13 +224,29 @@ def generate_queue(
     templates = audit_payload.get("autoComments", {}) if isinstance(audit_payload.get("autoComments"), dict) else {}
     findings = audit_payload.get("findings", []) if isinstance(audit_payload.get("findings"), list) else []
 
-    selected = [f for f in findings if isinstance(f, dict) and should_include(f, min_signal)][:limit]
+    # Source feeds may repeat a finding. Apply the cap to unique identities so
+    # one logical item has one claim and cannot consume multiple send attempts.
+    selected = []
+    seen_findings: set[str] = set()
+    for finding in findings:
+        if len(selected) >= limit:
+            break
+        if not isinstance(finding, dict) or not should_include(finding, min_signal):
+            continue
+        item_id = queue_item_id(finding)
+        if item_id in seen_findings:
+            continue
+        seen_findings.add(item_id)
+        selected.append(finding)
 
     now = now_utc()
     items: list[dict[str, Any]] = []
     for finding in selected:
         item_id = queue_item_id(finding)
         prior = old_map.get(item_id, {})
+        if prior and (prior.get("status") != "queued" or int(prior.get("attempts", 0) or 0) > 0):
+            items.append(prior)  # Attempts freeze exact text and reconciliation evidence.
+            continue
         reason = str(finding.get("reasonCode", ""))
         template = str(templates.get(reason, ""))
         texts = build_comment_texts(finding, template)
@@ -215,6 +278,10 @@ def generate_queue(
             }
         )
 
+    selected_ids = {row["id"] for row in items}
+    items.extend(row for row in old_items if row["id"] not in selected_ids and (row.get("status") != "queued" or int(row.get("attempts", 0) or 0) > 0))
+    if len(items) > 10000:
+        raise ValueError("Queue history capacity requires owner archival; receipts cannot be evicted")
     payload = {
         "generatedAt": iso(now),
         "sourceAuditGeneratedAt": audit_payload.get("generatedAt"),
@@ -272,43 +339,113 @@ def render_markdown(queue_payload: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def adapter_arguments(template: str) -> tuple[list[str], list[tuple[str, str]]]:
+    """Admit a trusted execution prefix and a closed data-only adapter protocol.
+
+    Untrusted fields cannot select executables, scripts, switches or positional
+    arguments. Values become --key=value tokens so leading dashes stay data.
+    Operators own the executable/script and must keep those files trusted.
+    """
+    command = shlex.split(template)
+    if not command or not Path(command[0]).is_absolute() or any(c in command[0] for c in "{}"):
+        raise ValueError("absolute_fixed_executable_required")
+    name = Path(command[0]).name.lower()
+    if name in {"sh", "bash", "dash", "zsh", "fish", "cmd", "powershell", "pwsh", "env", "xargs", "sudo"}:
+        raise ValueError("shell_or_launcher_adapter_denied")
+    prefix = command[:1]
+    remaining = command[1:]
+    if re.fullmatch(r"python(?:[0-9]+(?:\.[0-9]+)*)?", name) or name in {"node", "nodejs"}:
+        # No interpreter flags, module execution or dynamic program selection.
+        if not remaining or not Path(remaining[0]).is_absolute() or any(c in remaining[0] for c in "{}"):
+            raise ValueError("fixed_absolute_adapter_script_required")
+        suffixes = {".py"} if name.startswith("python") else {".js", ".mjs", ".cjs"}
+        if Path(remaining[0]).suffix not in suffixes:
+            raise ValueError("adapter_script_type_required")
+        prefix.append(remaining.pop(0))
+    allowed = {"--slug": "{slug}", "--owner": "{owner}",
+               "--comment-file": "{comment_file}", "--body-file": "{comment_file}"}
+    pairs = []
+    seen = set()
+    while remaining:
+        token = remaining.pop(0)
+        if "=" in token:
+            key, value = token.split("=", 1)
+        else:
+            key = token
+            if not remaining:
+                raise ValueError("adapter_data_value_required")
+            value = remaining.pop(0)
+        if key not in allowed or value != allowed[key] or key in seen:
+            raise ValueError("unsupported_adapter_argument")
+        seen.add(key)
+        pairs.append((key, value[1:-1]))
+    if not seen.intersection({"--comment-file", "--body-file"}):
+        raise ValueError("private_comment_file_required")
+    return prefix, pairs
+
+
 def run_post_command(command_template: str, item: dict[str, Any]) -> tuple[bool, str]:
-    comment = item.get("comment", {}) if isinstance(item.get("comment"), dict) else {}
-    body = str(comment.get("combined", "")).strip()
+    """Run only the fixed adapter prefix plus data; require provider receipt.
+
+    Timeout/nonzero/malformed output is uncertain, never automatic retry authority.
+    Arbitrary comment text is passed only through a private temporary file.
+    """
+    body = str((item.get("comment") or {}).get("combined", "")).strip()
     if not body:
         return False, "empty_comment_body"
+    try:
+        prefix, arguments = adapter_arguments(command_template)
+    except ValueError:
+        return False, "invalid_adapter_arguments"
+    comment_file = None
+    try:
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, suffix=".md") as tf:
+            tf.write(body + "\n")
+            comment_file = tf.name
+        fields = dict(slug=str(item.get("slug", "")), owner=str(item.get("owner", "")),
+                      comment_file=comment_file)
+        argv = prefix + [key + "=" + fields[field] for key, field in arguments]
+        result = subprocess.run(argv, shell=False, text=True, capture_output=True, timeout=120)
+        if result.returncode != 0:
+            return False, "adapter_outcome_uncertain"
+        receipt = json.loads(result.stdout)
+        if not isinstance(receipt, dict) or receipt.get("confirmed") is not True or not isinstance(receipt.get("receipt_id"), str) or not receipt["receipt_id"].strip() or not 1 <= len(receipt["receipt_id"]) <= 200:
+            return False, "adapter_confirmation_missing"
+        return True, json.dumps({"confirmed": True, "receipt_id": receipt["receipt_id"]})
+    except (ValueError, KeyError, OSError, subprocess.SubprocessError):
+        return False, "adapter_outcome_uncertain"
+    finally:
+        if comment_file is not None:
+            if os.path.exists(comment_file):
+                os.unlink(comment_file)
 
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, suffix=".md") as tf:
-        tf.write(body + "\n")
-        comment_file = tf.name
 
-    expanded = command_template.format(
-        slug=item.get("slug", ""),
-        owner=item.get("owner", ""),
-        comment_file=comment_file,
-        comment_text=body.replace("\n", " "),
-        comment_text_b64=base64.b64encode(body.encode("utf-8")).decode("ascii"),
-    )
-    result = subprocess.run(expanded, shell=True, text=True, capture_output=True, timeout=120)
-    if result.returncode == 0:
-        return True, (result.stdout or "posted").strip()
-    err = (result.stderr or result.stdout or "").strip()
-    return False, err or f"post_command_failed_exit_{result.returncode}"
+@contextmanager
+def queue_lock(path: Path):
+    """One local worker owns generation plus delivery; lock files contain no data."""
+    descriptor = os.open(str(path) + ".lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        yield
+    finally:
+        os.close(descriptor)
 
 
-def process_queue(queue_payload: dict[str, Any], queue_path: Path, max_posts: int, post_command: str) -> dict[str, Any]:
-    items = queue_payload.get("items", [])
-    if not isinstance(items, list):
-        return queue_payload
+def _process_queue(queue_payload: dict[str, Any], queue_path: Path, max_posts: int, post_command: str) -> dict[str, Any]:
+    items = validated_queue_items(queue_payload)
 
     now = now_utc()
     posted = 0
+    attempted = 0
     for item in items:
         if not isinstance(item, dict):
             continue
-        if posted >= max_posts:
+        if attempted >= max_posts:
             break
-        if str(item.get("status", "queued")) == "posted":
+        if item.get("status") == "posting":
+            item["status"] = "uncertain"
+            item["lastError"] = "interrupted_adapter_requires_owner_reconciliation"
+        if str(item.get("status", "queued")) != "queued":
             continue
         next_attempt = item.get("nextAttemptAt")
         if isinstance(next_attempt, str):
@@ -328,8 +465,11 @@ def process_queue(queue_payload: dict[str, Any], queue_path: Path, max_posts: in
             item["updatedAt"] = iso(now)
             continue
 
-        ok, info = run_post_command(post_command, item)
+        attempted += 1
+        item["status"] = "posting"
         item["attempts"] = int(item.get("attempts", 0) or 0) + 1
+        save_json(queue_path, queue_payload)
+        ok, info = run_post_command(post_command, item)
         item["updatedAt"] = iso(now)
         if ok:
             posted += 1
@@ -338,14 +478,20 @@ def process_queue(queue_payload: dict[str, Any], queue_path: Path, max_posts: in
             item["lastError"] = None
             item["postReceipt"] = info
         else:
-            item["status"] = "queued"
+            item["status"] = "uncertain"
             item["lastError"] = info
             item["nextAttemptAt"] = iso(now + timedelta(minutes=30))
 
     queue_payload["processedAt"] = iso(now)
-    queue_payload["postStats"] = {"postedThisRun": posted, "maxPostsPerRun": max_posts}
+    queue_payload["postStats"] = {"postedThisRun": posted, "attemptedThisRun": attempted, "maxPostsPerRun": max_posts}
     save_json(queue_path, queue_payload)
     return queue_payload
+
+
+def process_queue(queue_payload, queue_path, max_posts, post_command):
+    with queue_lock(queue_path):
+        durable = load_json(queue_path, queue_payload)
+        return _process_queue(durable, queue_path, max_posts, post_command)
 
 
 def main() -> None:
@@ -365,25 +511,26 @@ def main() -> None:
     queue_path = root / args.queue
     comments_md_path = root / args.comments_md
 
-    audit_payload = load_json(audit_path, {})
-    if not isinstance(audit_payload, dict):
-        raise SystemExit(f"Invalid audit payload: {audit_path}")
+    with queue_lock(queue_path):
+        audit_payload = load_json(audit_path, {})
+        if not isinstance(audit_payload, dict):
+            raise SystemExit(f"Invalid audit payload: {audit_path}")
 
-    queue_payload = generate_queue(audit_payload, queue_path, max(1, int(args.limit)), args.min_signal)
-    if args.process:
-        queue_payload = process_queue(
-            queue_payload,
-            queue_path,
-            max(1, int(args.max_posts)),
-            str(args.post_command or "").strip(),
-        )
+        queue_payload = generate_queue(audit_payload, queue_path, max(1, int(args.limit)), args.min_signal)
+        if args.process:
+            queue_payload = _process_queue(
+                queue_payload,
+                queue_path,
+                max(1, int(args.max_posts)),
+                str(args.post_command or "").strip(),
+            )
 
-    comments_md_path.write_text(render_markdown(queue_payload), encoding="utf-8")
-    print(f"Updated queue: {queue_path}")
-    print(f"Updated comments: {comments_md_path}")
-    if args.process:
-        stats = queue_payload.get("postStats", {})
-        print(f"Queue processing: posted {stats.get('postedThisRun', 0)} item(s)")
+        comments_md_path.write_text(render_markdown(queue_payload), encoding="utf-8")
+        print(f"Updated queue: {queue_path}")
+        print(f"Updated comments: {comments_md_path}")
+        if args.process:
+            stats = queue_payload.get("postStats", {})
+            print(f"Queue processing: posted {stats.get('postedThisRun', 0)} item(s)")
 
 
 if __name__ == "__main__":

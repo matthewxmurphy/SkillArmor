@@ -221,3 +221,7 @@ Vhost plan + deploy config:
 - Local UI includes a **Vhost Manager** section for plan import/export + deploy command copy.
 - CTO dashboard:
   - `dashboard/cto-dashboard.html`
+
+## Security maintenance
+
+See [security boundaries, configuration and tests](docs/SECURITY-BOUNDARIES.md).
