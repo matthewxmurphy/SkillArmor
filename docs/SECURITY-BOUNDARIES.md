@@ -61,3 +61,9 @@ required remote checks/branch enforcement and release/runtime acceptance remain
 to be assessed in their own scoped maintenance work. The portable helper currently
 has internal distribution terms; public products must not copy it without recorded
 permission. A source commit and offline test pass do not certify a release.
+
+### Claim durability and receipt validation — October 18, 2026
+
+Atomic queue replacement synchronizes the private temporary file, replaces the queue path and synchronizes the parent directory before returning. A failed/unsupported directory sync aborts the run before an adapter can use that claim. The visible interrupted claim remains held for owner reconciliation; it is not automatically retried. Local tests verify file-sync/directory-sync/adapter ordering and injected directory-sync failure on this operating system. They do not establish hardware power-loss recovery or filesystem/controller guarantees.
+
+Adapter receipt IDs must contain a non-whitespace character and remain within the existing 200-character bound. Usable IDs retain their exact original bytes; blank/whitespace-only confirmations are uncertain and cannot trigger automatic retry. Native delivery remains the owned adapter's responsibility.

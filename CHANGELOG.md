@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — queue durability follow-up 2026-10-18
+
+- Synchronize the queue parent directory after atomic replacement; abort before adapter execution if the claim durability barrier fails.
+- Treat whitespace-only adapter receipt IDs as uncertain and preserve usable opaque IDs exactly.
+- Add local ordering, injected sync-failure and blank-receipt regressions; no real posting or power-loss acceptance is claimed.
+
 ## Unreleased — queue identity maintenance 2026-10-18
 
 - Select repeated source IDs once and apply the queue limit to unique findings.

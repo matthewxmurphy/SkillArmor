@@ -8,6 +8,7 @@ from pathlib import Path
 import subprocess
 import sys
 import shlex
+import stat
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -79,6 +80,69 @@ class QueueTests(unittest.TestCase):
         for response in [subprocess.CompletedProcess([], 1, '', 'private error'), subprocess.CompletedProcess([], 0, 'posted', ''), subprocess.CompletedProcess([], 0, '{"confirmed":false}', '')]:
             with patch.object(worker.subprocess, "run", return_value=response):
                 self.assertFalse(worker.run_post_command('/usr/local/bin/owned-adapter --body-file {comment_file}', item())[0])
+
+    def test_blank_receipt_identity_is_uncertain_and_never_auto_retried(self):
+        for identity in ["", "   ", "\t\r\n", "\u00a0"]:
+            with self.subTest(identity=identity), tempfile.TemporaryDirectory() as td:
+                path = Path(td) / "queue.json"
+                payload = {"items": [item()]}
+                response = subprocess.CompletedProcess([], 0, json.dumps({"confirmed": True, "receipt_id": identity}), "")
+                with patch.object(worker.subprocess, "run", return_value=response) as adapter:
+                    result = worker.process_queue(payload, path, 1, '/synthetic/owned-adapter --body-file {comment_file}')
+                    self.assertEqual(result["items"][0]["status"], "uncertain")
+                    self.assertEqual(result["items"][0]["lastError"], "adapter_confirmation_missing")
+                    worker.process_queue(payload, path, 1, '/synthetic/owned-adapter --body-file {comment_file}')
+                    self.assertEqual(adapter.call_count, 1)
+
+    def test_nonblank_receipt_identity_is_preserved_exactly(self):
+        identity = "  provider/opaque:receipt-001  "
+        response = subprocess.CompletedProcess([], 0, json.dumps({"confirmed": True, "receipt_id": identity}), "")
+        with patch.object(worker.subprocess, "run", return_value=response):
+            confirmed, receipt = worker.run_post_command('/synthetic/owned-adapter --body-file {comment_file}', item())
+        self.assertTrue(confirmed)
+        self.assertEqual(json.loads(receipt)["receipt_id"], identity)
+
+    def test_claim_file_and_directory_are_synced_before_adapter_execution(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "queue.json"
+            events = []
+            original_fsync = worker.os.fsync
+            def sync(descriptor):
+                original_fsync(descriptor)
+                events.append("directory_sync" if stat.S_ISDIR(worker.os.fstat(descriptor).st_mode) else "file_sync")
+            def adapter(*_args):
+                self.assertEqual(events, ["file_sync", "directory_sync"])
+                self.assertEqual(json.loads(path.read_text())["items"][0]["status"], "posting")
+                events.append("adapter")
+                return True, "synthetic-confirmed"
+            with patch.object(worker.os, "fsync", side_effect=sync), patch.object(worker, "run_post_command", side_effect=adapter):
+                result = worker.process_queue({"items": [item()]}, path, 1, "/synthetic/owned-adapter")
+            self.assertEqual(result["items"][0]["status"], "posted")
+            self.assertEqual(events, ["file_sync", "directory_sync", "adapter", "file_sync", "directory_sync"])
+
+    def test_failed_directory_sync_aborts_before_adapter_and_retains_interrupted_claim(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "queue.json"
+            original_fsync = worker.os.fsync
+            directory_descriptors = []
+            def sync(descriptor):
+                if stat.S_ISDIR(worker.os.fstat(descriptor).st_mode):
+                    directory_descriptors.append(descriptor)
+                    raise OSError("synthetic directory fsync failure")
+                original_fsync(descriptor)
+            with patch.object(worker.os, "fsync", side_effect=sync), patch.object(worker, "run_post_command") as adapter:
+                with self.assertRaisesRegex(OSError, "directory fsync failure"):
+                    worker.process_queue({"items": [item()]}, path, 1, "/synthetic/owned-adapter")
+                adapter.assert_not_called()
+            self.assertEqual(len(directory_descriptors), 1)
+            with self.assertRaises(OSError):
+                worker.os.fstat(directory_descriptors[0])
+            self.assertEqual(json.loads(path.read_text())["items"][0]["status"], "posting")
+            with patch.object(worker, "run_post_command") as adapter:
+                recovered = worker.process_queue({"items": []}, path, 1, "/synthetic/owned-adapter")
+                adapter.assert_not_called()
+            self.assertEqual(recovered["items"][0]["status"], "uncertain")
+            self.assertEqual(recovered["items"][0]["lastError"], "interrupted_adapter_requires_owner_reconciliation")
     def test_uncertain_delivery_is_durable_and_never_auto_retried(self):
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / "queue.json"; payload = {"items": [item()]}

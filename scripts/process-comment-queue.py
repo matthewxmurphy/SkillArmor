@@ -53,6 +53,14 @@ def save_json(path: Path, payload: Any) -> None:
             output.flush()
             os.fsync(output.fileno())
         os.replace(temporary, path)
+        # The rename is a separate durability boundary from the file contents.
+        # A claim may authorize an adapter only after its directory entry has
+        # also been synchronized; unsupported/failed sync must abort the run.
+        directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
@@ -401,7 +409,7 @@ def run_post_command(command_template: str, item: dict[str, Any]) -> tuple[bool,
         if result.returncode != 0:
             return False, "adapter_outcome_uncertain"
         receipt = json.loads(result.stdout)
-        if not isinstance(receipt, dict) or receipt.get("confirmed") is not True or not isinstance(receipt.get("receipt_id"), str) or not 1 <= len(receipt["receipt_id"]) <= 200:
+        if not isinstance(receipt, dict) or receipt.get("confirmed") is not True or not isinstance(receipt.get("receipt_id"), str) or not receipt["receipt_id"].strip() or not 1 <= len(receipt["receipt_id"]) <= 200:
             return False, "adapter_confirmation_missing"
         return True, json.dumps({"confirmed": True, "receipt_id": receipt["receipt_id"]})
     except (ValueError, KeyError, OSError, subprocess.SubprocessError):
