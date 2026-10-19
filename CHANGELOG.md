@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — queue identity maintenance 2026-10-18
+
+- Select repeated source IDs once and apply the queue limit to unique findings.
+- Reject duplicate or invalid durable identities before any claim or adapter
+  execution, preserving conflicting attempts and receipts for owner reconciliation.
+- Keep posting disabled by default; this source checkpoint performs no delivery,
+  production change or version release.
+
 
 ## Unreleased — source security maintenance2026-10-16
 

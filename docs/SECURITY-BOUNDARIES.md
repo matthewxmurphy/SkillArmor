@@ -17,6 +17,27 @@ Queue adapters execute a fixed absolute executable with shell=False. The executi
 
 Posting remains disabled by default. Existing postCommandTemplate configuration must name an absolute owned adapter, for example /usr/local/bin/owned-post-adapter --slug "{slug}" --body-file "{comment_file}". Legacy templates using raw comment_text/comment_text_b64, positional fields, interpreter flags or custom switches must migrate to this closed protocol before posting resumes. A Python example is `/absolute/python3 /absolute/adapter.py --slug "{slug}" --owner "{owner}" --body-file "{comment_file}"`. The adapter must independently reconcile platform delivery and emit JSON with confirmed:true and a nonempty receipt_id. Nonzero exit, timeout or malformed/unconfirmed output is uncertain. An owner must inspect native delivery before deliberately requeuing; a process exit alone is not delivery proof. This is a single-host POSIX-lock queue, not a distributed or multi-tenant service.
 
+### Unique delivery identities — October 18, 2026
+
+Repeated source findings with the same stable queue ID are selected once, before
+the unique-item limit is applied. Generation and delivery validate every durable
+record before changing state or invoking any adapter: IDs must be nonempty strings
+and must be unique across queued, in-flight, uncertain and posted records. A bad
+record anywhere holds the whole queue, including earlier otherwise valid items.
+
+Historical queues containing duplicate IDs now stop for owner reconciliation.
+Keep the original queue and native delivery evidence; inspect all conflicting
+attempts and receipts before preparing a corrected queue. Do not delete a posted
+or uncertain record merely to resume automatic posting. The worker preserves the
+malformed file bytes rather than merging conflicting receipts or falling back to
+an older in-memory queue. This prevents duplicate local claims; provider-side
+idempotency and actual delivery reconciliation remain the owned adapter's duty.
+
+The isolated regression includes repeated input findings, durable duplicates in
+each delivery state, and invalid IDs after a valid first row. Denied cases invoke
+no adapter and preserve queue bytes. The existing literal-argument, interrupted
+claim, uncertain outcome and concurrent-owner contracts remain required.
+
 ## Test and rollback
 
 Required local security check: `python3 -m unittest discover -s tests -v`. Tests use synthetic temporary state,

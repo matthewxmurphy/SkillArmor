@@ -15,8 +15,8 @@ from unittest.mock import patch
 spec = importlib.util.spec_from_file_location("queue_worker", Path(__file__).resolve().parents[1] / "scripts/process-comment-queue.py")
 worker = importlib.util.module_from_spec(spec); spec.loader.exec_module(worker)
 
-def item():
-    return {"slug": "$(touch /not-executed); ' \"", "owner": "owner;echo ignored", "status": "queued", "comment": {"combined": "$(ignored) ; `ignored` \n quoted text"}}
+def item(identity="synthetic-item"):
+    return {"id": identity, "slug": "$(touch /not-executed); ' \"", "owner": "owner;echo ignored", "status": "queued", "comment": {"combined": "$(ignored) ; `ignored` \n quoted text"}}
 
 class QueueTests(unittest.TestCase):
     def test_untrusted_fields_are_single_inert_arguments(self):
@@ -89,8 +89,8 @@ class QueueTests(unittest.TestCase):
                 self.assertEqual(run.call_count, 1)
     def test_one_attempt_limit_and_interrupted_claim_recovery(self):
         with tempfile.TemporaryDirectory() as td:
-            path = Path(td) / "queue.json"; old = item(); old["status"] = "posting"
-            payload = {"items": [old, item(), item()]}
+            path = Path(td) / "queue.json"; old = item("interrupted"); old["status"] = "posting"
+            payload = {"items": [old, item("first"), item("second")]}
             with patch.object(worker, "run_post_command", return_value=(False, "uncertain")) as run:
                 result = worker.process_queue(payload, path, 1, '/usr/local/bin/adapter')
                 self.assertEqual(run.call_count, 1)
@@ -116,5 +116,45 @@ class QueueTests(unittest.TestCase):
             worker.save_json(path, {"items":[previous]})
             result = worker.generate_queue({"findings":[]}, path, 1, "medium")
             self.assertEqual(result["items"], [previous])
+
+    def test_repeated_source_identity_has_one_delivery_and_does_not_consume_unique_limit(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "queue.json"
+            finding = {"slug":"synthetic-skill", "reasonCode":"review", "signalLevel":"medium"}
+            other = {**finding, "slug":"another-skill"}
+            payload = worker.generate_queue({"findings":[finding, dict(finding), other]}, path, 2, "medium")
+            self.assertEqual([row["slug"] for row in payload["items"]], ["synthetic-skill", "another-skill"])
+            with patch.object(worker, "run_post_command", return_value=(True, "synthetic-confirmed")) as run:
+                worker.process_queue(payload, path, 2, "/synthetic/adapter")
+                worker.process_queue(payload, path, 2, "/synthetic/adapter")
+            self.assertEqual(run.call_count, 2)
+            self.assertEqual({call.args[1]["slug"] for call in run.call_args_list}, {"synthetic-skill", "another-skill"})
+
+    def test_duplicate_durable_identities_never_deliver_or_rewrite_receipts(self):
+        for prior_status in ["queued", "posting", "uncertain", "posted"]:
+            with self.subTest(status=prior_status), tempfile.TemporaryDirectory() as td:
+                path = Path(td) / "queue.json"
+                previous = {**item(), "status":prior_status, "attempts":1, "postReceipt":"synthetic-receipt"}
+                worker.save_json(path, {"items":[previous, item()]})
+                before = path.read_bytes()
+                with patch.object(worker, "run_post_command") as run:
+                    with self.assertRaisesRegex(ValueError, "Duplicate queue identities"):
+                        worker.process_queue({"items":[item("stale-default")]}, path, 2, "/synthetic/adapter")
+                    with self.assertRaisesRegex(ValueError, "Duplicate queue identities"):
+                        worker.generate_queue({"findings":[]}, path, 2, "medium")
+                    run.assert_not_called()
+                self.assertEqual(path.read_bytes(), before)
+
+    def test_missing_or_nonstring_durable_identity_fails_before_any_attempt(self):
+        for identity in [None, "", "   ", 7, True]:
+            with self.subTest(identity=identity), tempfile.TemporaryDirectory() as td:
+                path = Path(td) / "queue.json"
+                worker.save_json(path, {"items":[item("valid-first"), item(identity)]})
+                before = path.read_bytes()
+                with patch.object(worker, "run_post_command") as run:
+                    with self.assertRaisesRegex(ValueError, "nonempty string identities"):
+                        worker.process_queue({"items":[]}, path, 2, "/synthetic/adapter")
+                    run.assert_not_called()
+                self.assertEqual(path.read_bytes(), before)
 
 if __name__ == '__main__': unittest.main()

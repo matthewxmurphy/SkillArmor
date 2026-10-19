@@ -181,16 +181,34 @@ def should_include(finding: dict[str, Any], min_signal: str) -> bool:
     return SIGNAL_RANK.get(signal, 0) >= SIGNAL_RANK.get(min_signal, 2)
 
 
+def validated_queue_items(payload: Any) -> list[dict[str, Any]]:
+    """Require one durable record per item before generation or delivery.
+
+    Duplicate identities can carry conflicting attempts/receipts, so persisted
+    duplicates require owner reconciliation rather than merging or posting both.
+    Validation finishes before callers mutate state or invoke an adapter.
+    """
+    if not isinstance(payload, dict) or not isinstance(payload.get("items"), list):
+        raise ValueError("Malformed persisted queue requires owner repair")
+    seen: set[str] = set()
+    for row in payload["items"]:
+        item_id = row.get("id") if isinstance(row, dict) else None
+        if not isinstance(item_id, str) or not item_id.strip():
+            raise ValueError("Queue items require nonempty string identities")
+        if item_id in seen:
+            raise ValueError("Duplicate queue identities require owner reconciliation")
+        seen.add(item_id)
+    return payload["items"]
+
+
 def generate_queue(
     audit_payload: dict[str, Any],
     queue_path: Path,
     limit: int,
     min_signal: str,
 ) -> dict[str, Any]:
-    existing = load_json(queue_path, {})
-    if not isinstance(existing, dict) or (queue_path.exists() and (not isinstance(existing.get("items"), list) or any(not isinstance(row, dict) or not row.get("id") for row in existing["items"]))):
-        raise ValueError("Malformed persisted queue requires owner repair")
-    old_items = existing.get("items", []) if isinstance(existing.get("items"), list) else []
+    existing = load_json(queue_path, {"items": []})
+    old_items = validated_queue_items(existing)
     old_map = {
         str(item.get("id")): item for item in old_items if isinstance(item, dict) and item.get("id")
     }
@@ -198,7 +216,20 @@ def generate_queue(
     templates = audit_payload.get("autoComments", {}) if isinstance(audit_payload.get("autoComments"), dict) else {}
     findings = audit_payload.get("findings", []) if isinstance(audit_payload.get("findings"), list) else []
 
-    selected = [f for f in findings if isinstance(f, dict) and should_include(f, min_signal)][:limit]
+    # Source feeds may repeat a finding. Apply the cap to unique identities so
+    # one logical item has one claim and cannot consume multiple send attempts.
+    selected = []
+    seen_findings: set[str] = set()
+    for finding in findings:
+        if len(selected) >= limit:
+            break
+        if not isinstance(finding, dict) or not should_include(finding, min_signal):
+            continue
+        item_id = queue_item_id(finding)
+        if item_id in seen_findings:
+            continue
+        seen_findings.add(item_id)
+        selected.append(finding)
 
     now = now_utc()
     items: list[dict[str, Any]] = []
@@ -393,9 +424,7 @@ def queue_lock(path: Path):
 
 
 def _process_queue(queue_payload: dict[str, Any], queue_path: Path, max_posts: int, post_command: str) -> dict[str, Any]:
-    items = queue_payload.get("items", [])
-    if not isinstance(items, list):
-        return queue_payload
+    items = validated_queue_items(queue_payload)
 
     now = now_utc()
     posted = 0
